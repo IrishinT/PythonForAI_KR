@@ -1,0 +1,5 @@
+Модель,Лучшие параметры,Accuracy,Precision,Recall,F1-score,ROC-AUC,Время (с)
+Random Forest,"{'max_depth': None, 'min_samples_leaf': 2, 'n_estimators': 100}",0.8537,0.7737,0.4907,0.6005,0.8818,56.2
+Logistic Regression,"{'C': 10.0, 'class_weight': 'balanced'}",0.7886,0.5192,0.7689,0.6198,0.8638,35.7
+Decision Tree,"{'criterion': 'gini', 'max_depth': 15, 'min_samples_leaf': 50}",0.8398,0.7038,0.4924,0.5794,0.8468,32.0
+KNN,"{'n_neighbors': 15, 'weights': 'distance'}",0.8373,0.7378,0.4251,0.5394,0.8458,26.5
