@@ -1,1 +1,10 @@
 /.venv/
+/X_test.csv
+/X_train.csv
+/y_test.csv
+/y_train.csv
+/ds_rainfall_distribution.png
+/ds_missing.png
+/1_ds_analyzing/ds_missing.png
+/1_ds_analyzing/ds_rainfall_distribution.png
+.idea
