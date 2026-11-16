@@ -22,6 +22,7 @@ def save_versioned_model(
     metrics: dict,
     base_version: str = "1.0.0",
     artifacts_dir: str = str(DEFAULT_ARTIFACTS_DIR),
+    preprocess_params: dict = None,
 ) -> dict:
     root_dir = Path(artifacts_dir)
     root_dir.mkdir(exist_ok=True)
@@ -46,6 +47,7 @@ def save_versioned_model(
         "feature_names": list(columns),
         "best_params": model.get_params(),
         "metrics": {k: float(v) for k, v in metrics.items()},
+        "preprocess_params": preprocess_params,
         "environment": {
             "sklearn": sklearn.__version__,
             "joblib": joblib.__version__,

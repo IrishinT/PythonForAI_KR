@@ -1,6 +1,7 @@
 import time
 import warnings
-import joblib
+import json
+from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -253,6 +254,13 @@ plt.tight_layout()
 plt.savefig("feature_importance.png", dpi=300)
 plt.show()
 
+preprocess_path = Path("preprocess_params.json")
+preprocess_params = (
+    json.loads(preprocess_path.read_text(encoding="utf-8"))
+    if preprocess_path.exists()
+    else None
+)
+
 # Сохранение лучшей модели и списка колонок
 best_metrics = results_df.iloc[0][["Accuracy", "Precision", "Recall", "F1-score", "ROC-AUC"]].to_dict()
 metadata = save_versioned_model(
@@ -260,5 +268,6 @@ metadata = save_versioned_model(
     columns=X_train.columns,
     model_name=best_model_name,
     metrics=best_metrics,
+    preprocess_params=preprocess_params,
 )
 print(f"\nМодель {best_model_name} (v{metadata['version']}) сохранена в artifacts/v{metadata['version']}/")

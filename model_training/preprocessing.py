@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import (
@@ -29,13 +30,17 @@ num_cols = df.select_dtypes(include=[np.number]).columns.drop("RainTomorrow")
 cat_cols = df.select_dtypes(include=["object", "str"]).columns
 
 # Заполняем числовые признаки медианой
+medians = {}
 for col in num_cols:
-    median_val = df[col].median()
+    median_val = float(df[col].median())
+    medians[col] = median_val
     df[col] = df[col].fillna(median_val)
 
 # Заполняем категориальные признаки модой
+modes = {}
 for col in cat_cols:
-    mode_val = df[col].mode()[0]
+    mode_val = str(df[col].mode()[0])
+    modes[col] = mode_val
     df[col] = df[col].fillna(mode_val)
 
 print(f"Осталось пропусков в датасете = {df.isnull().sum().sum()}")
@@ -65,9 +70,19 @@ X_test[num_cols] = (X_test[num_cols] - train_mean) / train_std
 print(f"Размер X_train: {X_train.shape}")
 print(f"Размер X_test:  {X_test.shape}")
 
+
+preprocess_params = {
+    "medians": medians,
+    "modes": modes,
+    "mean": {col: float(train_mean[col]) for col in num_cols},
+    "std": {col: float(train_std[col]) for col in num_cols},
+}
+with open("preprocess_params.json", "w", encoding="utf-8") as f:
+    json.dump(preprocess_params, f, ensure_ascii=False, indent=2)
+
 X_train.to_csv("X_train.csv", index=False)
 X_test.to_csv("X_test.csv", index=False)
 y_train.to_csv("y_train.csv", index=False)
 y_test.to_csv("y_test.csv", index=False)
 
-print("Результат сохранён в X_train.csv, X_test.csv, y_train.csv, y_test.csv")
+print("Результат сохранён в X_train.csv, X_test.csv, y_train.csv, y_test.csv и preprocess_params.json")
