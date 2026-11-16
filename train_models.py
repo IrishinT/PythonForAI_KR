@@ -8,6 +8,8 @@ import seaborn as sns
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.neural_network import MLPClassifier
+
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -75,6 +77,20 @@ models_config = {
             "min_samples_leaf": [2, 10],
         },
         "use_subsample": True,
+    },
+    "Neural Network (MLP)": {
+        "estimator": MLPClassifier(
+            random_state=42, 
+            max_iter=100, 
+            early_stopping=True,
+            n_iter_no_change=5
+        ),
+        "param_grid": {
+            "hidden_layer_sizes": [(64,), (64, 32)],
+            "activation": ["relu"],
+            "alpha": [0.0001, 0.01],
+        },
+        "use_subsample": False,
     },
 }
 
