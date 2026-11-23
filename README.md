@@ -84,16 +84,15 @@ python -m presentation.telegram_bot
 
 Откройте личный чат с ботом и отправьте `/start`.
 
-## Запуск на сервере через Docker Compose
+## Docker Compose
 
-На сервере с Docker и плагином Compose подготовьте `.env` по образцу [`.env.example`](.env.example) и укажите в нём `TELEGRAM_BOT_TOKEN`. Затем из корня проекта запустите API и бота.
+Укажите `TELEGRAM_BOT_TOKEN` в `.env` по образцу [`.env.example`](.env.example) и запустите из корня проекта.
 
 ```text
 docker compose up -d --build
-docker compose ps
 ```
 
-Бот подключается к API по внутренней сети Docker. На сервере API доступен по адресу `127.0.0.1:8000`. Порт можно задать через `WEATHER_API_PORT` в `.env`. Конфигурация запуска хранится в [compose.yaml](compose.yaml).
+Для доступа к API с другого компьютера задайте в `.env` `WEATHER_API_BIND=0.0.0.0` и нужный `WEATHER_API_PORT`.
 
 ## Обучение и исследование признаков
 
