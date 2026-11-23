@@ -1,5 +1,3 @@
-from math import isfinite
-
 from PySide6.QtCore import QPointF, QRegularExpression, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QRegularExpressionValidator
 from PySide6.QtWidgets import (
@@ -16,16 +14,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .weather_options import LOCATIONS, WIND_DIRECTIONS
-
-MEASUREMENTS = (
-    ("Humidity3pm", "Влажность в 15:00", "%", "70"),
-    ("Pressure3pm", "Давление в 15:00", "гПа", "1015,2"),
-    ("MinTemp", "Мин. температура", "°C", "12"),
-    ("Rainfall", "Осадки за день", "мм", "0,6"),
-    ("WindGustSpeed", "Макс. порыв ветра", "км/ч", "40"),
+from presentation.weather_input import (
+    LOCATIONS,
+    MEASUREMENTS,
+    WIND_DIRECTIONS,
+    format_probability,
+    measurement_pattern,
+    parse_measurement,
 )
-DECIMAL_PATTERN = r"(?:[0-9]+(?:[.,][0-9]*)?|[.,][0-9]+)"
 
 
 def label(text, name):
@@ -187,8 +183,7 @@ class ForecastWindow(QMainWindow):
             entry = QLineEdit()
             entry.setPlaceholderText(f"Например, {example}")
             entry.setMaxLength(24)
-            sign = "-?" if name == "MinTemp" else ""
-            pattern = QRegularExpression(sign + DECIMAL_PATTERN)
+            pattern = QRegularExpression(measurement_pattern(name))
             entry.setValidator(QRegularExpressionValidator(pattern, entry))
             if name == "Pressure3pm":
                 entry.setToolTip("Если давление указано в кПа, умножьте его на 10, чтобы получить гПа.")
@@ -292,21 +287,10 @@ class ForecastWindow(QMainWindow):
         weather = {"Location": self.location.currentData(), "WindDir3pm": self.wind.currentData()}
         for name, title, _, _ in MEASUREMENTS:
             entry = self.entries[name]
-            if not entry.hasAcceptableInput():
-                return None, entry, f"Введите число в поле «{title}»."
             try:
-                value = float(entry.text().strip().replace(",", "."))
-            except ValueError:
-                value = float("nan")
-            if not isfinite(value):
-                return None, entry, f"Введите число в поле «{title}»."
-            if name == "Humidity3pm" and not 0 <= value <= 100:
-                return None, entry, "Влажность должна быть от 0 до 100%."
-            if name == "Pressure3pm" and not 900 <= value <= 1100:
-                return None, entry, "Введите давление от 900 до 1100 гПа. Если оно указано в кПа, умножьте значение на 10."
-            if name in ("Rainfall", "WindGustSpeed") and value < 0:
-                return None, entry, f"Значение в поле «{title}» должно быть неотрицательным."
-            weather[name] = value
+                weather[name] = parse_measurement(name, title, entry.text())
+            except ValueError as error:
+                return None, entry, str(error)
 
         if not weather["Location"]:
             return None, self.location, "Выберите место наблюдения."
@@ -337,8 +321,7 @@ class ForecastWindow(QMainWindow):
     def show_prediction(self, rain, probability, version):
         self.set_loading(False)
         self.weather_icon.set_rain(rain)
-        number = f"{probability * 100:.2f}".rstrip("0").rstrip(".").replace(".", ",")
-        self.probability.setText(f"{number}%")
+        self.probability.setText(format_probability(probability))
         self.verdict.setText("Ожидается дождь" if rain else "Дождь не ожидается")
         self.place.setText(self.location.currentText())
         self.result_card.setToolTip(f"Модель v{version}" if version else "")
