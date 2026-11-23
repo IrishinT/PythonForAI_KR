@@ -6,6 +6,7 @@ from presentation.weather_input import LOCATIONS, WIND_DIRECTIONS
 
 LOCATIONS_PER_PAGE = 12
 LAST_PAGE = (len(LOCATIONS) - 1) // LOCATIONS_PER_PAGE
+WIND_ARROWS = ("⬆️", "↗️", "➡️", "↘️", "⬇️", "↙️", "⬅️", "↖️")
 
 
 class LocationChoice(CallbackData, prefix="station"):
@@ -47,7 +48,8 @@ def location_keyboard(page=0):
 
 def wind_keyboard():
     keyboard = InlineKeyboardBuilder()
-    for code, _ in WIND_DIRECTIONS:
-        keyboard.button(text=code, callback_data=WindChoice(code=code))
+    # Коды идут по кругу от N. На одну стрелку приходится два направления.
+    for index, (code, _) in enumerate(WIND_DIRECTIONS):
+        keyboard.button(text=f"{WIND_ARROWS[index // 2]} {code}", callback_data=WindChoice(code=code))
     keyboard.adjust(4)
     return keyboard.as_markup()

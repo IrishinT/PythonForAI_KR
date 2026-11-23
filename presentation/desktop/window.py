@@ -1,27 +1,34 @@
 from PySide6.QtCore import QPointF, QRegularExpression, Qt
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QRegularExpressionValidator
 from PySide6.QtWidgets import (
+    QAbstractSpinBox,
     QComboBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QMainWindow,
     QPushButton,
     QScrollArea,
+    QStyle,
+    QStyleOptionSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
+from business.weather_limits import WEATHER_LIMITS
 from presentation.weather_input import (
+    DECIMAL_PATTERN,
     LOCATIONS,
     MEASUREMENTS,
+    PRESSURE_HINT,
     WIND_DIRECTIONS,
     format_probability,
-    measurement_pattern,
+    measurement_range,
     parse_measurement,
 )
+
+MEASUREMENT_STEPS = {"MinTemp": 0.5, "Rainfall": 0.1}
 
 
 def label(text, name):
@@ -103,6 +110,66 @@ class ChoiceBox(QComboBox):
         painter.drawLine(QPointF(x, y + 2), QPointF(x + 4, y - 2))
 
 
+class MeasurementSpinBox(QAbstractSpinBox):
+    def __init__(self, name, example):
+        super().__init__()
+        self.minimum, self.maximum = WEATHER_LIMITS[name]
+        self.start_value = float(example.replace(",", "."))
+        self.step = MEASUREMENT_STEPS.get(name, 1)
+        editor = self.lineEdit()
+        editor.setPlaceholderText(f"{self.minimum}–{self.maximum}")
+        editor.setMaxLength(24)
+        editor.setTextMargins(10, 0, 0, 0)
+        editor.setValidator(QRegularExpressionValidator(QRegularExpression(DECIMAL_PATTERN), editor))
+
+    def number(self):
+        try:
+            return float(self.text().replace(",", "."))
+        except ValueError:
+            return None
+
+    def stepEnabled(self):
+        value = self.number()
+        flags = self.StepEnabledFlag.StepNone
+        if value is None or value < self.maximum:
+            flags |= self.StepEnabledFlag.StepUpEnabled
+        if value is None or value > self.minimum:
+            flags |= self.StepEnabledFlag.StepDownEnabled
+        return flags
+
+    def stepBy(self, steps):
+        value = self.number()
+        value = self.start_value if value is None else value + steps * self.step
+        value = min(max(value, self.minimum), self.maximum)
+        text = f"{value:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+        self.lineEdit().setText(text)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        option = QStyleOptionSpinBox()
+        self.initStyleOption(option)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        enabled = self.stepEnabled() if self.isEnabled() else self.StepEnabledFlag.StepNone
+        buttons = (
+            (QStyle.SubControl.SC_SpinBoxUp, self.StepEnabledFlag.StepUpEnabled, -1),
+            (QStyle.SubControl.SC_SpinBoxDown, self.StepEnabledFlag.StepDownEnabled, 1),
+        )
+        for control, flag, direction in buttons:
+            bounds = self.style().subControlRect(QStyle.ComplexControl.CC_SpinBox, option, control, self)
+            x, y = bounds.center().x(), bounds.center().y()
+            ink = "#52677d" if enabled & flag else "#aebac5"
+            painter.setPen(QPen(QColor(ink), 1.5))
+            painter.drawLine(QPointF(x - 4, y - 2 * direction), QPointF(x, y + 2 * direction))
+            painter.drawLine(QPointF(x, y + 2 * direction), QPointF(x + 4, y - 2 * direction))
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
 class ForecastWindow(QMainWindow):
     def __init__(self, client):
         super().__init__()
@@ -129,7 +196,7 @@ class ForecastWindow(QMainWindow):
 
         heading = QVBoxLayout()
         heading.setSpacing(6)
-        heading.addWidget(label("Дождь завтра", "heading"))
+        heading.addWidget(label("Будет ли завтра дождь?", "heading"))
         heading.addWidget(label("Прогноз по данным сегодняшних наблюдений.", "subtitle"))
         top.addLayout(heading)
         top.addStretch()
@@ -180,15 +247,13 @@ class ForecastWindow(QMainWindow):
         fields.addWidget(self.field("Место наблюдения", self.location), 0, 0, 1, 2)
 
         for index, (name, title, unit, example) in enumerate(MEASUREMENTS):
-            entry = QLineEdit()
-            entry.setPlaceholderText(f"Например, {example}")
-            entry.setMaxLength(24)
-            pattern = QRegularExpression(measurement_pattern(name))
-            entry.setValidator(QRegularExpressionValidator(pattern, entry))
+            entry = MeasurementSpinBox(name, example)
+            hint = f"Допустимо {measurement_range(name, unit)}."
             if name == "Pressure3pm":
-                entry.setToolTip("Если давление указано в кПа, умножьте его на 10, чтобы получить гПа.")
-            entry.textEdited.connect(self.clear_feedback)
-            entry.returnPressed.connect(self.submit)
+                hint = f"{hint} {PRESSURE_HINT}"
+            entry.setToolTip(hint)
+            entry.lineEdit().textChanged.connect(self.clear_feedback)
+            entry.lineEdit().returnPressed.connect(self.submit)
             self.entries[name] = entry
             row, column = divmod(index, 2)
             fields.addWidget(self.field(f"{title}, {unit}", entry), row + 1, column)
@@ -285,10 +350,10 @@ class ForecastWindow(QMainWindow):
 
     def read_form(self):
         weather = {"Location": self.location.currentData(), "WindDir3pm": self.wind.currentData()}
-        for name, title, _, _ in MEASUREMENTS:
+        for name, title, unit, _ in MEASUREMENTS:
             entry = self.entries[name]
             try:
-                weather[name] = parse_measurement(name, title, entry.text())
+                weather[name] = parse_measurement(name, title, unit, entry.text())
             except ValueError as error:
                 return None, entry, str(error)
 

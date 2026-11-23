@@ -1,6 +1,8 @@
 import re
 from math import isfinite
 
+from business.weather_limits import WEATHER_LIMITS
+
 MEASUREMENTS = (
     ("Humidity3pm", "Влажность в 15:00", "%", "70"),
     ("Pressure3pm", "Давление в 15:00", "гПа", "1015,2"),
@@ -8,7 +10,8 @@ MEASUREMENTS = (
     ("Rainfall", "Осадки за день", "мм", "0,6"),
     ("WindGustSpeed", "Макс. порыв ветра", "км/ч", "40"),
 )
-DECIMAL_PATTERN = r"(?:[0-9]+(?:[.,][0-9]*)?|[.,][0-9]+)"
+DECIMAL_PATTERN = r"-?(?:[0-9]+(?:[.,][0-9]*)?|[.,][0-9]+)"
+PRESSURE_HINT = "Если давление указано в кПа, умножьте значение на 10."
 
 LOCATIONS = (
     "Adelaide", "Albany", "Albury", "AliceSprings", "BadgerysCreek", "Ballarat",
@@ -32,22 +35,25 @@ WIND_DIRECTIONS = (
 )
 
 
-def measurement_pattern(name):
-    return "-?" + DECIMAL_PATTERN if name == "MinTemp" else DECIMAL_PATTERN
+def measurement_range(name, unit):
+    minimum, maximum = WEATHER_LIMITS[name]
+    return f"от {minimum} до {maximum} {unit}"
 
 
-def parse_measurement(name, title, text):
+def parse_measurement(name, title, unit, text):
     text = text.strip()
     error = f"Введите число в поле «{title}»."
-    if re.fullmatch(measurement_pattern(name), text) is None:
+    if re.fullmatch(DECIMAL_PATTERN, text) is None:
         raise ValueError(error)
     value = float(text.replace(",", "."))
     if not isfinite(value):
         raise ValueError(error)
-    if name == "Humidity3pm" and not 0 <= value <= 100:
-        raise ValueError("Влажность должна быть от 0 до 100%.")
-    if name == "Pressure3pm" and not 900 <= value <= 1100:
-        raise ValueError("Введите давление от 900 до 1100 гПа. Если оно указано в кПа, умножьте значение на 10.")
+    minimum, maximum = WEATHER_LIMITS[name]
+    if not minimum <= value <= maximum:
+        message = f"Значение должно быть {measurement_range(name, unit)}."
+        if name == "Pressure3pm":
+            message = f"{message} {PRESSURE_HINT}"
+        raise ValueError(message)
     return value
 
 

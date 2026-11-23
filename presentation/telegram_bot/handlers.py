@@ -1,11 +1,14 @@
+from html import escape
+
 from aiogram import F, Router
-from aiogram.enums import ChatType
+from aiogram.enums import ChatType, ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
+from business.weather_limits import WEATHER_LIMITS
 from presentation.weather_input import (
     LOCATIONS,
     MEASUREMENTS,
@@ -137,17 +140,18 @@ async def type_location(message: Message, state: FSMContext):
 
 
 async def ask_measurement(message: Message, step: int):
-    _, title, unit, example = MEASUREMENTS[step]
-    await message.answer(f"{title}, {unit}. Например, {example}.")
+    name, title, unit, _ = MEASUREMENTS[step]
+    minimum, maximum = WEATHER_LIMITS[name]
+    await message.answer(f"{title} ({minimum}–{maximum} {unit})")
 
 
 @router.message(Forecast.measurement)
 async def read_measurement(message: Message, state: FSMContext):
     data = await state.get_data()
     step = data["step"]
-    name, title, _, _ = MEASUREMENTS[step]
+    name, title, unit, _ = MEASUREMENTS[step]
     try:
-        value = parse_measurement(name, title, message.text or "")
+        value = parse_measurement(name, title, unit, message.text or "")
     except ValueError as error:
         await message.answer(str(error))
         return
@@ -159,7 +163,7 @@ async def read_measurement(message: Message, state: FSMContext):
         return
     await state.set_state(Forecast.wind)
     prompt = await message.answer(
-        "Выберите направление ветра в 15:00. N — север, E — восток, S — юг, W — запад.",
+        "Выберите, откуда дует ветер в 15:00. Например, ↖️ NW — с северо-запада.",
         reply_markup=wind_keyboard(),
     )
     await state.update_data(keyboard_id=prompt.message_id)
@@ -177,9 +181,11 @@ async def send_forecast(message: Message, state: FSMContext, weather_api: Weathe
         return
 
     await state.clear()
-    verdict = "🌧 Ожидается дождь" if rain else "☀️ Дождь не ожидается"
+    verdict = "🌧 Завтра ожидается дождь" if rain else "☀️ Завтра дождь не ожидается"
+    location = escape(weather["Location"])
     await message.answer(
-        f"{verdict}\n{weather['Location']} · завтра\nВероятность дождя: {format_probability(probability)}",
+        f"<b>{verdict}</b>\n{location}\n\nВероятность дождя — <b>{format_probability(probability)}</b>",
+        parse_mode=ParseMode.HTML,
         reply_markup=forecast_menu(),
     )
 

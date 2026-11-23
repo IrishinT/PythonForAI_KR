@@ -93,7 +93,7 @@ QLabel {
     font-size: 13px;
     font-weight: 500;
 }
-QLineEdit, QComboBox {
+QAbstractSpinBox, QComboBox {
     border: 1px solid #c9d4df;
     border-radius: 7px;
     background: #ffffff;
@@ -102,12 +102,37 @@ QLineEdit, QComboBox {
     selection-color: #182b43;
     placeholder-text-color: #657589;
 }
-QLineEdit:hover, QComboBox:hover {
+QAbstractSpinBox:hover, QComboBox:hover {
     background: #f9fbfd;
     border-color: #aab9ca;
 }
-QLineEdit:focus, QComboBox:focus {
+QAbstractSpinBox:focus, QComboBox:focus {
     border: 1px solid #3265a6;
+}
+QAbstractSpinBox QLineEdit {
+    border: 0;
+    background: transparent;
+}
+QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {
+    subcontrol-origin: border;
+    width: 28px;
+    height: 19px;
+    border-left: 1px solid #dbe3eb;
+    background: #f4f7fa;
+}
+QAbstractSpinBox::up-button {
+    subcontrol-position: top right;
+    border-top-right-radius: 6px;
+}
+QAbstractSpinBox::down-button {
+    subcontrol-position: bottom right;
+    border-bottom-right-radius: 6px;
+}
+QAbstractSpinBox::up-button:hover, QAbstractSpinBox::down-button:hover {
+    background: #e9f1fb;
+}
+QAbstractSpinBox::up-arrow, QAbstractSpinBox::down-arrow {
+    image: none;
 }
 QComboBox {
     padding-right: 5px;
@@ -134,7 +159,7 @@ QComboBox QAbstractItemView::item {
     padding: 5px 10px;
     min-height: 25px;
 }
-QLineEdit:disabled, QComboBox:disabled {
+QAbstractSpinBox:disabled, QComboBox:disabled {
     color: #687888;
     background: #f4f6f8;
 }
