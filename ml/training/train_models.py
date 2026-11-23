@@ -1,6 +1,6 @@
+import sys
 import time
 import warnings
-import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,7 +23,13 @@ from sklearn.metrics import (
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
-from model_registry import save_versioned_model
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from business.model_registry import save_versioned_model
+from data.datasets import load_preprocess_params, load_training_data
+
+REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 
 warnings.filterwarnings("ignore")
 pd.set_option("display.max_columns", None)
@@ -31,10 +37,9 @@ pd.set_option("display.width", 1000)
 
 # Загрузка подготовленных данных
 print("Загрузка обучающей и тестовой выборок...")
-X_train = pd.read_csv("X_train.csv")
-X_test = pd.read_csv("X_test.csv")
-y_train = pd.read_csv("y_train.csv").values.ravel()
-y_test = pd.read_csv("y_test.csv").values.ravel()
+X_train, X_test, y_train, y_test = load_training_data()
+preprocess_params = load_preprocess_params()
+REPORTS_DIR.mkdir(exist_ok=True)
 
 print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
 
@@ -163,7 +168,7 @@ for name, config in models_config.items():
 results_df = pd.DataFrame(results).sort_values(by="ROC-AUC", ascending=False).reset_index(drop=True)
 print("\n================ СВОДНАЯ ТАБЛИЦА МЕТРИК ================")
 print(results_df.to_string(index=False))
-results_df.to_csv("models_metrics_comparison.csv", index=False)
+results_df.to_csv(REPORTS_DIR / "models_metrics_comparison.csv", index=False)
 
 best_model_name = results_df.iloc[0]["Модель"]
 best_model_instance = trained_models[best_model_name]
@@ -181,7 +186,7 @@ plt.title("ROC-кривые моделей классификации погод
 plt.legend(loc="lower right")
 plt.grid(alpha=0.3)
 plt.tight_layout()
-plt.savefig("models_roc_curves.png", dpi=300)
+plt.savefig(REPORTS_DIR / "models_roc_curves.png", dpi=300)
 plt.show()
 
 # Сравнение метрик (Столбчатая диаграмма)
@@ -198,7 +203,7 @@ plt.title("Сравнение показателей качества модел
 plt.ylabel("Значение метрики")
 plt.grid(axis="y", alpha=0.3)
 plt.tight_layout()
-plt.savefig("models_metrics_comparison.png", dpi=300)
+plt.savefig(REPORTS_DIR / "models_metrics_comparison.png", dpi=300)
 plt.show()
 
 # Матрица ошибок (Confusion Matrix) для лучшей модели
@@ -218,7 +223,7 @@ plt.title(f"Матрица ошибок лучшей модели ({best_model_n
 plt.xlabel("Предсказанный класс")
 plt.ylabel("Истинный класс")
 plt.tight_layout()
-plt.savefig("best_model_confusion_matrix.png", dpi=300)
+plt.savefig(REPORTS_DIR / "best_model_confusion_matrix.png", dpi=300)
 plt.show()
 
 # Анализ важности признаков (Feature Importance)
@@ -251,15 +256,8 @@ plt.title(f"15 наиболее значимых признаков ({best_model
 plt.xlabel("Относительная важность признака")
 plt.ylabel("Признак")
 plt.tight_layout()
-plt.savefig("feature_importance.png", dpi=300)
+plt.savefig(REPORTS_DIR / "feature_importance.png", dpi=300)
 plt.show()
-
-preprocess_path = Path("preprocess_params.json")
-preprocess_params = (
-    json.loads(preprocess_path.read_text(encoding="utf-8"))
-    if preprocess_path.exists()
-    else None
-)
 
 # Сохранение лучшей модели и списка колонок
 best_metrics = results_df.iloc[0][["Accuracy", "Precision", "Recall", "F1-score", "ROC-AUC"]].to_dict()

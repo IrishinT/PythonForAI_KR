@@ -1,11 +1,18 @@
-import json
+import sys
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import (
-    train_test_split,
-) 
+from sklearn.model_selection import train_test_split
 
-df = pd.read_csv("weatherAUS.csv")
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from data.datasets import load_raw_weather, save_training_data
+from ml.features import encode_categories, encode_rain_today, fill_missing, scale_numeric
+
+
+df = load_raw_weather()
 print(f"Загружен датасет: {df.shape} строк")
 
 # Удаление признаков с экстремальным количеством пропусков (>38%)
@@ -23,30 +30,23 @@ df = df.drop(columns=["Date"])
 
 # биннаризация переменных
 df["RainTomorrow"] = (df["RainTomorrow"] == "Yes").astype(int)
-df["RainToday"] = df["RainToday"].map({"No": 0, "Yes": 1})
+df["RainToday"] = encode_rain_today(df["RainToday"])
 
 # Разделяем на числовые и категориальные признаки
 num_cols = df.select_dtypes(include=[np.number]).columns.drop("RainTomorrow")
 cat_cols = df.select_dtypes(include=["object", "str"]).columns
 
 # Заполняем числовые признаки медианой
-medians = {}
-for col in num_cols:
-    median_val = float(df[col].median())
-    medians[col] = median_val
-    df[col] = df[col].fillna(median_val)
+medians = {col: float(df[col].median()) for col in num_cols}
 
 # Заполняем категориальные признаки модой
-modes = {}
-for col in cat_cols:
-    mode_val = str(df[col].mode()[0])
-    modes[col] = mode_val
-    df[col] = df[col].fillna(mode_val)
+modes = {col: str(df[col].mode()[0]) for col in cat_cols}
+df = fill_missing(df, medians, modes)
 
 print(f"Осталось пропусков в датасете = {df.isnull().sum().sum()}")
 
 # Кодирование категориальных признаков One-Hot Encoding
-df = pd.get_dummies(df, columns=cat_cols, drop_first=True, dtype=int)
+df = encode_categories(df, cat_cols, drop_first=True)
 print(f"Размер после One-Hot Encoding: {df.shape}")
 
 # Разделение на X (признаки) и y (цель)
@@ -60,12 +60,12 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 # Для алгоритмов KNN и Logistic Regression необходимо приведение к одному масштабу.
 # Подсчёт среднего и стандартного отклонения на X_train:
-train_mean = X_train[num_cols].mean()
-train_std = X_train[num_cols].std()
+train_mean = {col: float(value) for col, value in X_train[num_cols].mean().items()}
+train_std = {col: float(value) for col, value in X_train[num_cols].std().items()}
 
 # (X - mu) / sigma
-X_train[num_cols] = (X_train[num_cols] - train_mean) / train_std
-X_test[num_cols] = (X_test[num_cols] - train_mean) / train_std
+X_train = scale_numeric(X_train, train_mean, train_std)
+X_test = scale_numeric(X_test, train_mean, train_std)
 
 print(f"Размер X_train: {X_train.shape}")
 print(f"Размер X_test:  {X_test.shape}")
@@ -74,15 +74,9 @@ print(f"Размер X_test:  {X_test.shape}")
 preprocess_params = {
     "medians": medians,
     "modes": modes,
-    "mean": {col: float(train_mean[col]) for col in num_cols},
-    "std": {col: float(train_std[col]) for col in num_cols},
+    "mean": train_mean,
+    "std": train_std,
 }
-with open("preprocess_params.json", "w", encoding="utf-8") as f:
-    json.dump(preprocess_params, f, ensure_ascii=False, indent=2)
+save_training_data(X_train, X_test, y_train, y_test, preprocess_params)
 
-X_train.to_csv("X_train.csv", index=False)
-X_test.to_csv("X_test.csv", index=False)
-y_train.to_csv("y_train.csv", index=False)
-y_test.to_csv("y_test.csv", index=False)
-
-print("Результат сохранён в X_train.csv, X_test.csv, y_train.csv, y_test.csv и preprocess_params.json")
+print("Выборки и параметры преобразования сохранены в data/processed/")

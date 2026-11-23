@@ -1,12 +1,22 @@
+import sys
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from data.datasets import load_raw_weather
+
+REPORTS_DIR = Path(__file__).resolve().parent
+
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", 1000)
 
-df = pd.read_csv("weatherAUS.csv")
+df = load_raw_weather()
 
 print(f"Загружен датасет: {df.shape[0]} строк, {df.shape[1]} колонок")
 
@@ -47,7 +57,7 @@ plt.title("Процент пропущенных значений в призн�
 plt.xlabel("Процент пропусков (%)")
 plt.ylabel("Признаки")
 plt.tight_layout()
-plt.savefig("ds_missing.png", dpi=300)
+plt.savefig(REPORTS_DIR / "ds_missing.png", dpi=300)
 plt.show()
 
 
@@ -83,7 +93,7 @@ sns.boxplot(x=df["Rainfall"], color="lightblue")
 plt.title("Boxplot осадков (Rainfall) - Выбросы")
 
 plt.tight_layout()
-plt.savefig("ds_rainfall_distribution.png", dpi=300)
+plt.savefig(REPORTS_DIR / "ds_rainfall_distribution.png", dpi=300)
 plt.show()
 
 
