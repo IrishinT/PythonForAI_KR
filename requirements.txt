@@ -1,4 +1,3 @@
-# Полная установка. Для отдельного компонента используйте его requirements.txt.
 -r presentation/desktop/requirements.txt
 -r presentation/telegram_bot/requirements.txt
 -r business/api/requirements.txt
