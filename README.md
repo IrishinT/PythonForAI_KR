@@ -70,7 +70,7 @@ python -m uvicorn business.api:app
 python -m presentation.desktop
 ```
 
-Чтобы подключиться к API по другому адресу, укажите его через `--api-url`.
+Адрес API задаётся в `WEATHER_API_URL` в корневом `.env`. Параметр `--api-url` при запуске имеет приоритет.
 
 ### Telegram-бот
 
