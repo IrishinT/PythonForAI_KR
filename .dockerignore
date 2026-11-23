@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+.env.*
+**/.env
+**/.env.*
+**/__pycache__
+**/*.pyc
+local_notes
+data/raw
+data/processed
+ml/training
+ml/analysis
+presentation/desktop
