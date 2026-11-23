@@ -8,7 +8,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from business.weather_limits import WEATHER_LIMITS
 from presentation.weather_input import (
     LOCATIONS,
     MEASUREMENTS,
@@ -16,6 +15,7 @@ from presentation.weather_input import (
     format_probability,
     parse_measurement,
 )
+from weather_contract import WEATHER_LIMITS
 
 from .keyboards import (
     LAST_PAGE,

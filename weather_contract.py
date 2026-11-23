@@ -5,3 +5,5 @@ WEATHER_LIMITS = {
     "Rainfall": (0, 500),
     "WindGustSpeed": (0, 150),
 }
+
+DEFAULT_WEATHER = {"Location": "Sydney", "RainToday": "No", "Month": 6}

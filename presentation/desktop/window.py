@@ -16,7 +16,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from business.weather_limits import WEATHER_LIMITS
 from presentation.weather_input import (
     DECIMAL_PATTERN,
     LOCATIONS,
@@ -27,6 +26,7 @@ from presentation.weather_input import (
     measurement_range,
     parse_measurement,
 )
+from weather_contract import WEATHER_LIMITS
 
 MEASUREMENT_STEPS = {"MinTemp": 0.5, "Rainfall": 0.1}
 

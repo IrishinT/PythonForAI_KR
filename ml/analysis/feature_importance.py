@@ -6,10 +6,10 @@ from sklearn.inspection import permutation_importance
 from sklearn.metrics import average_precision_score, f1_score, roc_auc_score
 from threadpoolctl import threadpool_limits
 
-from business.api.schemas import WeatherInput
 from business.model_registry import load_versioned_model
 from data.datasets import load_preprocess_params, load_raw_weather, load_training_data
 from ml.features import encode_rain_today, prepare_features, select_preprocess_params
+from weather_contract import DEFAULT_WEATHER
 
 RANDOM_STATE = 42
 MAX_AUC_LOSS = 0.01
@@ -74,7 +74,7 @@ def check_api(selected_fields):
 
     # Подставляем те же значения, что API подставляет при пропуске поля.
     X_test = X_test[columns]
-    defaults = prepare_features(WeatherInput().model_dump(), columns, params).iloc[0]
+    defaults = prepare_features(DEFAULT_WEATHER, columns, params).iloc[0]
     short_input = X_test.copy()
     for column in columns:
         if column.partition("_")[0] not in selected_fields:

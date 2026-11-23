@@ -1,7 +1,7 @@
 import re
 from math import isfinite
 
-from business.weather_limits import WEATHER_LIMITS
+from weather_contract import WEATHER_LIMITS
 
 MEASUREMENTS = (
     ("Humidity3pm", "Влажность в 15:00", "%", "70"),

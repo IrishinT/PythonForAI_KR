@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from business.weather_limits import WEATHER_LIMITS
+from weather_contract import DEFAULT_WEATHER, WEATHER_LIMITS
 
 
 def measurement_field(name):
@@ -21,10 +21,10 @@ class WeatherInput(BaseModel):
     Pressure3pm: float | None = measurement_field("Pressure3pm")
     Temp9am: float | None = None
     Temp3pm: float | None = None
-    RainToday: str | None = Field(default="No", examples=["No", "Yes"])
-    Month: int = Field(default=6, ge=1, le=12)
+    RainToday: str | None = Field(default=DEFAULT_WEATHER["RainToday"], examples=["No", "Yes"])
+    Month: int = Field(default=DEFAULT_WEATHER["Month"], ge=1, le=12)
 
-    Location: str | None = Field(default="Sydney", examples=["Sydney", "Melbourne"])
+    Location: str | None = Field(default=DEFAULT_WEATHER["Location"], examples=["Sydney", "Melbourne"])
     WindGustDir: str | None = Field(default=None, examples=["W", "NW", "SSE"])
     WindDir9am: str | None = Field(default=None, examples=["W", "NW", "SSE"])
     WindDir3pm: str | None = Field(default=None, examples=["W", "NW", "SSE"])
