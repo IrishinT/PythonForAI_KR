@@ -1,6 +1,6 @@
 Модель,Лучшие параметры,Accuracy,Precision,Recall,F1-score,ROC-AUC,Время (с)
-Neural Network (MLP),"{'activation': 'relu', 'alpha': 0.01, 'hidden_layer_sizes': (64, 32)}",0.8607,0.7442,0.5769,0.65,0.8929,61.6
-Random Forest,"{'max_depth': None, 'min_samples_leaf': 2, 'n_estimators': 100}",0.8537,0.7737,0.4907,0.6005,0.8818,59.0
-Logistic Regression,"{'C': 10.0, 'class_weight': 'balanced'}",0.7886,0.5192,0.7689,0.6198,0.8638,35.5
-Decision Tree,"{'criterion': 'gini', 'max_depth': 15, 'min_samples_leaf': 50}",0.8398,0.7038,0.4924,0.5794,0.8468,33.3
-KNN,"{'n_neighbors': 15, 'weights': 'distance'}",0.8373,0.7378,0.4251,0.5394,0.8458,28.0
+Neural Network (MLP),"{'activation': 'relu', 'alpha': 0.01, 'hidden_layer_sizes': (64,)}",0.8556,0.7532,0.5294,0.6218,0.8848,31.6
+Random Forest,"{'max_depth': None, 'min_samples_leaf': 2, 'n_estimators': 100}",0.852,0.7651,0.4905,0.5978,0.8754,46.0
+Logistic Regression,"{'C': 10.0, 'class_weight': 'balanced'}",0.7828,0.5105,0.7534,0.6086,0.8567,17.3
+Decision Tree,"{'criterion': 'gini', 'max_depth': 15, 'min_samples_leaf': 50}",0.8396,0.707,0.486,0.576,0.8476,18.8
+KNN,"{'n_neighbors': 7, 'weights': 'distance'}",0.8331,0.6981,0.4502,0.5474,0.8219,15.0

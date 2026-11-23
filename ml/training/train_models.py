@@ -28,6 +28,7 @@ if not __package__:
 
 from business.model_registry import save_versioned_model
 from data.datasets import load_preprocess_params, load_training_data
+from ml.features import KEY_WEATHER_FIELDS, select_preprocess_params
 
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 
@@ -38,9 +39,20 @@ pd.set_option("display.width", 1000)
 # Загрузка подготовленных данных
 print("Загрузка обучающей и тестовой выборок...")
 X_train, X_test, y_train, y_test = load_training_data()
-preprocess_params = load_preprocess_params()
+preprocess_params = select_preprocess_params(load_preprocess_params(), KEY_WEATHER_FIELDS)
+
+# У города и направления ветра по несколько one-hot столбцов.
+columns = [column for column in X_train if column.partition("_")[0] in KEY_WEATHER_FIELDS]
+prepared_fields = {column.partition("_")[0] for column in columns}
+parameter_fields = preprocess_params["mean"].keys() | preprocess_params["modes"].keys()
+missing = set(KEY_WEATHER_FIELDS) - (prepared_fields & parameter_fields)
+if missing:
+    raise ValueError(f"В обучающей выборке нет полей: {', '.join(sorted(missing))}")
+X_train = X_train[columns]
+X_test = X_test[columns]
 REPORTS_DIR.mkdir(exist_ok=True)
 
+print(f"Поля для обучения: {', '.join(KEY_WEATHER_FIELDS)}")
 print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
 
 # Подвыборка (25 000 строк) для быстрого подбора гиперпараметров тяжелых моделей (KNN)
@@ -227,12 +239,14 @@ plt.savefig(REPORTS_DIR / "best_model_confusion_matrix.png", dpi=300)
 plt.show()
 
 # Анализ важности признаков (Feature Importance)
+importance_model_name = best_model_name
 if hasattr(best_model_instance, "feature_importances_"):
     importances = best_model_instance.feature_importances_
 elif hasattr(best_model_instance, "coef_"):
     importances = np.abs(best_model_instance.coef_[0])
 else:
-    importances = trained_models["Random Forest"].feature_importances_
+    importance_model_name = "Random Forest"
+    importances = trained_models[importance_model_name].feature_importances_
 
 feat_imp_df = (
     pd.DataFrame({"Признак": X_train.columns, "Важность": importances})
@@ -252,7 +266,7 @@ sns.barplot(
     hue="Признак",
     legend=False,
 )
-plt.title(f"15 наиболее значимых признаков ({best_model_name})")
+plt.title(f"15 наиболее значимых признаков ({importance_model_name})")
 plt.xlabel("Относительная важность признака")
 plt.ylabel("Признак")
 plt.tight_layout()

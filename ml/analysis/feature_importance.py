@@ -9,7 +9,7 @@ from threadpoolctl import threadpool_limits
 from business.api.schemas import WeatherInput
 from business.model_registry import load_versioned_model
 from data.datasets import load_preprocess_params, load_raw_weather, load_training_data
-from ml.features import encode_rain_today, prepare_features
+from ml.features import encode_rain_today, prepare_features, select_preprocess_params
 
 RANDOM_STATE = 42
 MAX_AUC_LOSS = 0.01
@@ -66,11 +66,14 @@ def check_api(selected_fields):
     _, X_test, _, y_test = load_training_data()
     params = metadata.get("preprocess_params")
     columns = metadata["feature_names"]
-    if params != load_preprocess_params() or columns != X_test.columns.tolist():
+    model_fields = {column.partition("_")[0] for column in columns}
+    expected_params = select_preprocess_params(load_preprocess_params(), model_fields)
+    if params != expected_params or not set(columns).issubset(X_test.columns):
         print("\nПроверка API пропущена: артефакт и подготовленная выборка различаются.")
         return
 
     # Подставляем те же значения, что API подставляет при пропуске поля.
+    X_test = X_test[columns]
     defaults = prepare_features(WeatherInput().model_dump(), columns, params).iloc[0]
     short_input = X_test.copy()
     for column in columns:
