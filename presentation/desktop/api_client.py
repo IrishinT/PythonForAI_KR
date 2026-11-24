@@ -10,6 +10,7 @@ HEALTH_INTERVAL_MS = 15000
 
 class PredictionClient(QObject):
     server_status = Signal(str)
+    server_version = Signal(str)
     predicted = Signal(bool, float, str, str)
     failed = Signal(str)
 
@@ -55,6 +56,20 @@ class PredictionClient(QObject):
         reply = self.network.get(request)
         reply.finished.connect(lambda: callback(*self.read_reply_bytes(reply)))
 
+    def training(self, key, callback, *, start=False):
+        request = self.request("/models/training")
+        request.setRawHeader(b"X-Master-Key", key.encode("utf-8"))
+        request.setAttribute(
+            QNetworkRequest.Attribute.RedirectPolicyAttribute,
+            QNetworkRequest.RedirectPolicy.ManualRedirectPolicy,
+        )
+        if start:
+            request.setHeader(QNetworkRequest.KnownHeaders.ContentTypeHeader, "application/json")
+            reply = self.network.post(request, QByteArray(b"{}"))
+        else:
+            reply = self.network.get(request)
+        reply.finished.connect(lambda: callback(*self.read_reply(reply)))
+
     def check_health(self):
         if self._prediction_reply is not None:
             return False
@@ -76,6 +91,8 @@ class PredictionClient(QObject):
         if status == 200 and payload.get("status") == "ok":
             state = "online"
         self.update_server_status(state)
+        if state == "online" and isinstance(payload.get("version"), str):
+            self.server_version.emit(payload["version"])
 
     def update_server_status(self, state):
         interval = HEALTH_INTERVAL_MS if state == "online" else RECONNECT_INTERVAL_MS

@@ -1,11 +1,14 @@
+from hmac import compare_digest
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Security
 from fastapi.responses import FileResponse
+from fastapi.security import APIKeyHeader
 
 from business.model_registry import (
     MODEL_ID_PATTERN,
     VERSION_PATTERN,
+    latest_model_version,
     list_model_releases,
     list_version_models,
     model_chart_path,
@@ -17,11 +20,33 @@ from .schemas import WeatherInput
 router = APIRouter()
 ModelVersion = Annotated[str | None, Query(pattern=VERSION_PATTERN, examples=["1.1.0"])]
 ModelId = Annotated[str | None, Query(pattern=MODEL_ID_PATTERN, examples=["random-forest"])]
+master_key_header = APIKeyHeader(name="X-Master-Key", auto_error=False)
+
+
+def require_master_key(request: Request, supplied: Annotated[str | None, Security(master_key_header)]):
+    configured = request.app.state.master_key
+    if not configured:
+        raise HTTPException(503, "Training is not configured")
+    if supplied is None or not compare_digest(supplied.encode("latin-1"), configured.encode("utf-8")):
+        raise HTTPException(401, "Invalid master key")
+
+
+@router.post("/models/training", status_code=202, dependencies=[Depends(require_master_key)])
+async def start_training(request: Request):
+    training = request.app.state.training
+    if not training.start():
+        raise HTTPException(409, "Training is already running")
+    return dict(training.state)
+
+
+@router.get("/models/training", dependencies=[Depends(require_master_key)])
+async def training_status(request: Request):
+    return dict(request.app.state.training.state)
 
 
 @router.get("/health")
 def health(request: Request):
-    service = request.app.state.prediction_service
+    service = request.app.state.load_prediction_service(latest_model_version(), None)
     return {
         "status": "ok",
         "model": service.model_name,
@@ -32,8 +57,8 @@ def health(request: Request):
 
 
 @router.get("/models", responses={404: {"description": "Model version not found"}})
-def models(request: Request, model_version: ModelVersion = None):
-    version = model_version or request.app.state.prediction_service.version
+def models(model_version: ModelVersion = None):
+    version = model_version or latest_model_version()
     try:
         return list_version_models(version)
     except FileNotFoundError as exc:
@@ -46,8 +71,8 @@ def model_versions():
 
 
 @router.get("/models/metrics", responses={404: {"description": "Model or version not found"}})
-def model_metrics(request: Request, model_version: ModelVersion = None, model_id: ModelId = None):
-    version = model_version or request.app.state.prediction_service.version
+def model_metrics(model_version: ModelVersion = None, model_id: ModelId = None):
+    version = model_version or latest_model_version()
     try:
         return read_model_metrics(version, model_id)
     except FileNotFoundError as exc:
@@ -59,8 +84,8 @@ def model_metrics(request: Request, model_version: ModelVersion = None, model_id
     response_class=FileResponse,
     responses={200: {"content": {"image/png": {}}}, 404: {"description": "Chart not found"}},
 )
-def model_chart(chart_id: str, request: Request, model_version: ModelVersion = None, model_id: ModelId = None):
-    version = model_version or request.app.state.prediction_service.version
+def model_chart(chart_id: str, model_version: ModelVersion = None, model_id: ModelId = None):
+    version = model_version or latest_model_version()
     try:
         path = model_chart_path(version, model_id, chart_id)
     except FileNotFoundError as exc:
@@ -75,16 +100,14 @@ def predict(
     model_version: ModelVersion = None,
     model_id: ModelId = None,
 ):
-    service = request.app.state.prediction_service
-    version = (model_version or service.version).removeprefix("v")
-    if version != service.version or model_id not in (None, service.model_id):
-        try:
-            service = request.app.state.load_prediction_service(version, model_id)
-        except FileNotFoundError as exc:
-            detail = f"Model version {version} not found"
-            if model_id is not None:
-                detail = f"Model {model_id} not found in version {version}"
-            raise HTTPException(404, detail) from exc
+    version = (model_version or latest_model_version()).removeprefix("v")
+    try:
+        service = request.app.state.load_prediction_service(version, model_id)
+    except FileNotFoundError as exc:
+        detail = f"Model version {version} not found"
+        if model_id is not None:
+            detail = f"Model {model_id} not found in version {version}"
+        raise HTTPException(404, detail) from exc
 
     prediction = service.predict(weather.model_dump())
     return {

@@ -8,14 +8,16 @@ WORKDIR /app
 FROM base AS api
 
 COPY business/api/requirements.txt business/api/requirements.txt
-COPY ml/requirements-inference.txt ml/requirements-inference.txt
+COPY ml/requirements.txt ml/requirements-inference.txt ml/
 RUN python -m pip install --no-cache-dir -r business/api/requirements.txt
 
 COPY weather_contract.py .
 COPY business/ business/
-COPY data/__init__.py data/model_artifacts.py data/
+COPY data/__init__.py data/model_artifacts.py data/datasets.py data/
+COPY data/processed/ data/processed/
 COPY ml/__init__.py ml/features.py ml/
-COPY artifacts/ artifacts/
+COPY ml/training/ ml/training/
+COPY --chown=10001:10001 artifacts/ artifacts/
 
 USER 10001:10001
 EXPOSE 8000

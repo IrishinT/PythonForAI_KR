@@ -7,6 +7,7 @@ from business import model_registry
 from business.prediction import PredictionService
 from data.model_artifacts import LEGACY_MODEL_ID
 from .routes import router
+from .training import TrainingJob, configured_master_key
 
 
 def load_prediction_service(version: str | None = None, model_id: str | None = None) -> PredictionService:
@@ -29,9 +30,14 @@ def load_prediction_service(version: str | None = None, model_id: str | None = N
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.prediction_service = load_prediction_service()
     app.state.load_prediction_service = lru_cache(maxsize=8)(load_prediction_service)
-    yield
+    app.state.load_prediction_service(model_registry.latest_model_version(), None)
+    app.state.master_key = configured_master_key()
+    app.state.training = TrainingJob()
+    try:
+        yield
+    finally:
+        await app.state.training.close()
 
 
 app = FastAPI(title="Weather Rain Prediction API", lifespan=lifespan)

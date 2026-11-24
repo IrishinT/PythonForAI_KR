@@ -3,6 +3,10 @@ services:
     build:
       context: .
       target: api
+    environment:
+      WEATHER_MASTER_KEY: "${WEATHER_MASTER_KEY:-}"
+    volumes:
+      - model-artifacts:/app/artifacts
     ports:
       - "${WEATHER_API_BIND:-127.0.0.1}:${WEATHER_API_PORT:-8000}:8000"
     healthcheck:
@@ -24,3 +28,6 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  model-artifacts:

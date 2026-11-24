@@ -24,7 +24,7 @@ def main():
         client = PredictionClient(args.api_url)
     except ValueError as error:
         parser.error(str(error))
-    window = ForecastWindow(client)
+    window = ForecastWindow(client, master_key=getenv("WEATHER_MASTER_KEY", ""))
     window.show()
     return app.exec()
 

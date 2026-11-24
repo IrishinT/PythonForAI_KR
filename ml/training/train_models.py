@@ -1,11 +1,14 @@
 import sys
 import time
 import warnings
+from argparse import ArgumentParser
+from contextlib import nullcontext
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from joblib import parallel_config
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -32,6 +35,10 @@ from ml.features import KEY_WEATHER_FIELDS, select_preprocess_params
 from ml.training.model_diagnostics import evaluation_diagnostics, learning_diagnostics, render_model_charts
 
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
+parser = ArgumentParser(description="Обучить и опубликовать выпуск моделей")
+parser.add_argument("--result-file", type=Path, help="Записать номер выпуска для API без общих отчётов")
+result_file = parser.parse_args().result_file
+jobs = 2 if result_file else -1
 
 warnings.filterwarnings("ignore")
 pd.set_option("display.max_columns", None)
@@ -51,7 +58,6 @@ if missing:
     raise ValueError(f"В обучающей выборке нет полей: {', '.join(sorted(missing))}")
 X_train = X_train[columns]
 X_test = X_test[columns]
-REPORTS_DIR.mkdir(exist_ok=True)
 
 print(f"Поля для обучения: {', '.join(KEY_WEATHER_FIELDS)}")
 print(f"X_train: {X_train.shape}, X_test: {X_test.shape}")
@@ -85,7 +91,7 @@ models_config = {
     },
     "KNN": {
         "id": "knn",
-        "estimator": KNeighborsClassifier(n_jobs=-1),
+        "estimator": KNeighborsClassifier(n_jobs=jobs),
         "param_grid": {
             "n_neighbors": [7, 15, 25],
             "weights": ["uniform", "distance"],
@@ -94,7 +100,7 @@ models_config = {
     },
     "Random Forest": {
         "id": "random-forest",
-        "estimator": RandomForestClassifier(random_state=42, n_jobs=-1),
+        "estimator": RandomForestClassifier(random_state=42, n_jobs=jobs),
         "param_grid": {
             "n_estimators": [100, 150],
             "max_depth": [12, 18, None],
@@ -137,9 +143,10 @@ for name, config in models_config.items():
         param_grid=config["param_grid"],
         scoring="f1",
         cv=3,
-        n_jobs=-1,
+        n_jobs=jobs,
     )
-    grid.fit(X_fit, y_fit)
+    with parallel_config(backend="threading") if result_file else nullcontext():
+        grid.fit(X_fit, y_fit)
     best_params = grid.best_params_
     print(f"Лучшие гиперпараметры: {best_params}")
 
@@ -195,7 +202,6 @@ for name, config in models_config.items():
 results_df = pd.DataFrame(results).sort_values(by="ROC-AUC", ascending=False).reset_index(drop=True)
 print("\n================ СВОДНАЯ ТАБЛИЦА МЕТРИК ================")
 print(results_df.to_string(index=False))
-results_df.to_csv(REPORTS_DIR / "models_metrics_comparison.csv", index=False)
 
 best_model = max(release_models.values(), key=lambda candidate: candidate.metrics["ROC-AUC"])
 best_model_name = best_model.name
@@ -203,6 +209,13 @@ best_model_instance = best_model.estimator
 print(f"\nЛучшая модель по ROC-AUC: {best_model_name}")
 release_version = save_model_release(release_models, X_train.columns, preprocess_params)
 print(f"Модели сохранены в artifacts/v{release_version}/")
+
+if result_file:
+    result_file.write_text(release_version, encoding="utf-8")
+    sys.exit(0)
+
+REPORTS_DIR.mkdir(exist_ok=True)
+results_df.to_csv(REPORTS_DIR / "models_metrics_comparison.csv", index=False)
 
 # ROC-кривые всех моделей
 plt.figure(figsize=(8, 6))

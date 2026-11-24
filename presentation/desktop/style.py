@@ -133,6 +133,15 @@ QTabBar::tab:hover {
     padding: 7px;
     color: #5c6d7e;
 }
+#trainingKey {
+    background: #ffffff;
+    border: 1px solid #c9d4df;
+    border-radius: 7px;
+    padding: 0 11px;
+}
+#trainingKey:focus {
+    border-color: #3265a6;
+}
 QAbstractSpinBox, QComboBox {
     border: 1px solid #c9d4df;
     border-radius: 7px;

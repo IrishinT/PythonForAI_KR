@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from presentation.desktop.metrics import MetricsPanel
+from presentation.desktop.training import TrainingPanel
 from presentation.weather_input import (
     DECIMAL_PATTERN,
     LOCATIONS,
@@ -173,7 +174,7 @@ class MeasurementSpinBox(QAbstractSpinBox):
 
 
 class ForecastWindow(QMainWindow):
-    def __init__(self, client):
+    def __init__(self, client, master_key=""):
         super().__init__()
         self.client = client
         self.entries = {}
@@ -234,12 +235,16 @@ class ForecastWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.metrics_panel = MetricsPanel()
+        self.training_panel = TrainingPanel(client, master_key)
+        self.training_panel.release_published.connect(lambda _: self.refresh_catalog())
         self.tabs.addTab(forecast_scroll, "Прогноз")
         self.tabs.addTab(self.metrics_panel, "Метрики")
+        self.tabs.addTab(self.training_panel, "Обучение")
         self.tabs.currentChanged.connect(self.refresh_metrics)
         body.addWidget(self.tabs, stretch=1)
 
         self.client.server_status.connect(self.show_server_status)
+        self.client.server_version.connect(self.check_catalog_version)
         self.client.predicted.connect(self.show_prediction)
         self.client.failed.connect(self.show_error)
         self.update_controls()
@@ -254,7 +259,7 @@ class ForecastWindow(QMainWindow):
         self.version_box = ChoiceBox("Выберите версию")
         self.model_box = ChoiceBox("Выберите модель")
         self.version_box.currentIndexChanged.connect(self.show_release_models)
-        self.model_box.currentIndexChanged.connect(self.model_changed)
+        self.model_box.currentIndexChanged.connect(lambda _: self.model_changed())
         layout.addWidget(self.field("Версия модели", self.version_box), 0, 0)
         layout.addWidget(self.field("Модель", self.model_box), 0, 1)
         layout.setColumnStretch(1, 1)
@@ -269,6 +274,10 @@ class ForecastWindow(QMainWindow):
         self.catalog_status.setText("Загружаем список моделей…")
         self.catalog_status.show()
         self.client.get_data("/models/versions", self.show_catalog)
+
+    def check_catalog_version(self, version):
+        if version != self.latest_version and not self.legacy_api:
+            self.refresh_catalog()
 
     def show_catalog(self, status, payload):
         self.catalog_pending = False
@@ -293,12 +302,12 @@ class ForecastWindow(QMainWindow):
             selected_version = version if version in self.releases else self.latest_version
             self.version_box.setCurrentIndex(max(0, self.version_box.findData(selected_version)))
         self.catalog_status.hide()
-        self.populate_models(model_id if selected_version == version else None)
+        self.populate_models(model_id if selected_version == version else None, previous_selection=(version, model_id))
 
     def show_release_models(self):
         self.populate_models()
 
-    def populate_models(self, preferred=None):
+    def populate_models(self, preferred=None, previous_selection=None):
         version = self.version_box.currentData()
         release = self.releases.get(version)
         with QSignalBlocker(self.model_box):
@@ -318,17 +327,17 @@ class ForecastWindow(QMainWindow):
                 if index < 0:
                     index = self.model_box.findData(default)
                 self.model_box.setCurrentIndex(max(0, index))
-        self.model_changed()
+        self.model_changed(preserve_feedback=previous_selection == self.selection())
 
     def selection(self):
         return self.version_box.currentData(), self.model_box.currentData()
 
-    def model_changed(self):
+    def model_changed(self, *, preserve_feedback=False):
         version, model_id = self.selection()
         release = self.releases.get(version)
         recommended = bool(release and version == self.latest_version and model_id == release["default_model_id"])
         update_state(self.model_box, "recommended", recommended)
-        if not self.loading:
+        if not self.loading and not preserve_feedback:
             self.clear_feedback()
         self.update_controls()
         self.refresh_metrics()

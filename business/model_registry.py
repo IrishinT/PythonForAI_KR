@@ -103,6 +103,10 @@ def _resolve_version(store: FileModelStore, version: str | None) -> str:
     return selected_version.removeprefix("v")
 
 
+def latest_model_version() -> str:
+    return _resolve_version(FileModelStore(DEFAULT_ARTIFACTS_DIR), None)
+
+
 def list_version_models(
     version: str | None = None,
     artifacts_dir: str | Path = DEFAULT_ARTIFACTS_DIR,

@@ -8,7 +8,6 @@
 **/*.pyc
 local_notes
 data/raw
-data/processed
-ml/training
+ml/training/reports
 ml/analysis
 presentation/desktop
