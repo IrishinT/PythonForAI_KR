@@ -148,6 +148,62 @@
     "F1-score": 0.65,
     "ROC-AUC": 0.8929
   },
+  "preprocess_params": {
+    "medians": {
+      "MinTemp": 12.0,
+      "MaxTemp": 22.6,
+      "Rainfall": 0.0,
+      "WindGustSpeed": 39.0,
+      "WindSpeed9am": 13.0,
+      "WindSpeed3pm": 19.0,
+      "Humidity9am": 70.0,
+      "Humidity3pm": 52.0,
+      "Pressure9am": 1017.6,
+      "Pressure3pm": 1015.2,
+      "Temp9am": 16.7,
+      "Temp3pm": 21.1,
+      "RainToday": 0.0,
+      "Month": 6.0
+    },
+    "modes": {
+      "Location": "Canberra",
+      "WindGustDir": "W",
+      "WindDir9am": "N",
+      "WindDir3pm": "SE"
+    },
+    "mean": {
+      "MinTemp": 12.17211790354625,
+      "MaxTemp": 23.21746663853579,
+      "Rainfall": 2.3373015454401607,
+      "WindGustSpeed": 39.89130931659546,
+      "WindSpeed9am": 13.972546020359724,
+      "WindSpeed3pm": 18.64404768183976,
+      "Humidity9am": 68.85297220317527,
+      "Humidity3pm": 51.51782794451184,
+      "Pressure9am": 1017.6544569861279,
+      "Pressure3pm": 1015.2565073052377,
+      "Temp9am": 16.97557096893296,
+      "Temp3pm": 21.665097491077237,
+      "RainToday": 0.22095926297097246,
+      "Month": 6.40715930868365
+    },
+    "std": {
+      "MinTemp": 6.391954383140647,
+      "MaxTemp": 7.112030026650538,
+      "Rainfall": 8.504887118795411,
+      "WindGustSpeed": 13.122535786021693,
+      "WindSpeed9am": 8.823970188083871,
+      "WindSpeed3pm": 8.715408741721085,
+      "Humidity9am": 18.934459177427566,
+      "Humidity3pm": 20.54015090339746,
+      "Pressure9am": 6.743523545003006,
+      "Pressure3pm": 6.679129255307475,
+      "Temp9am": 6.478271333773917,
+      "Temp3pm": 6.875008040346729,
+      "RainToday": 0.41489490274556484,
+      "Month": 3.422525085982109
+    }
+  },
   "environment": {
     "sklearn": "1.9.1",
     "joblib": "1.6.0"

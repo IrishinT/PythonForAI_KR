@@ -26,7 +26,7 @@ from sklearn.tree import DecisionTreeClassifier
 if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from business.model_registry import save_versioned_model
+from business.model_registry import ModelCandidate, save_model_release
 from data.datasets import load_preprocess_params, load_training_data
 from ml.features import KEY_WEATHER_FIELDS, select_preprocess_params
 
@@ -64,6 +64,7 @@ y_train_sub = y_train[sample_idx]
 # Конфигурация моделей и сеток гиперпараметров
 models_config = {
     "Logistic Regression": {
+        "id": "logistic-regression",
         "estimator": LogisticRegression(max_iter=1000, random_state=42),
         "param_grid": {
             "C": [0.01, 0.1, 1.0, 10.0],
@@ -72,6 +73,7 @@ models_config = {
         "use_subsample": False,
     },
     "Decision Tree": {
+        "id": "decision-tree",
         "estimator": DecisionTreeClassifier(random_state=42),
         "param_grid": {
             "max_depth": [5, 10, 15],
@@ -81,6 +83,7 @@ models_config = {
         "use_subsample": False,
     },
     "KNN": {
+        "id": "knn",
         "estimator": KNeighborsClassifier(n_jobs=-1),
         "param_grid": {
             "n_neighbors": [7, 15, 25],
@@ -89,6 +92,7 @@ models_config = {
         "use_subsample": True,
     },
     "Random Forest": {
+        "id": "random-forest",
         "estimator": RandomForestClassifier(random_state=42, n_jobs=-1),
         "param_grid": {
             "n_estimators": [100, 150],
@@ -98,6 +102,7 @@ models_config = {
         "use_subsample": True,
     },
     "Neural Network (MLP)": {
+        "id": "mlp",
         "estimator": MLPClassifier(
             random_state=42, 
             max_iter=100, 
@@ -114,7 +119,7 @@ models_config = {
 }
 
 results = []
-trained_models = {}
+release_models = {}
 roc_data = {}
 
 # Цикл подбора гиперпараметров, обучения и оценки
@@ -173,7 +178,13 @@ for name, config in models_config.items():
         }
     )
 
-    trained_models[name] = best_model
+    release_models[config["id"]] = ModelCandidate(best_model, name, {
+        "Accuracy": acc,
+        "Precision": prec,
+        "Recall": rec,
+        "F1-score": f1,
+        "ROC-AUC": roc_auc,
+    })
     fpr, tpr, _ = roc_curve(y_test, y_proba)
     roc_data[name] = (fpr, tpr, roc_auc)
 
@@ -182,9 +193,12 @@ print("\n================ СВОДНАЯ ТАБЛИЦА МЕТРИК ===========
 print(results_df.to_string(index=False))
 results_df.to_csv(REPORTS_DIR / "models_metrics_comparison.csv", index=False)
 
-best_model_name = results_df.iloc[0]["Модель"]
-best_model_instance = trained_models[best_model_name]
+best_model = max(release_models.values(), key=lambda candidate: candidate.metrics["ROC-AUC"])
+best_model_name = best_model.name
+best_model_instance = best_model.estimator
 print(f"\nЛучшая модель по ROC-AUC: {best_model_name}")
+release_version = save_model_release(release_models, X_train.columns, preprocess_params)
+print(f"Модели сохранены в artifacts/v{release_version}/")
 
 # ROC-кривые всех моделей
 plt.figure(figsize=(8, 6))
@@ -245,8 +259,9 @@ if hasattr(best_model_instance, "feature_importances_"):
 elif hasattr(best_model_instance, "coef_"):
     importances = np.abs(best_model_instance.coef_[0])
 else:
-    importance_model_name = "Random Forest"
-    importances = trained_models[importance_model_name].feature_importances_
+    importance_model = release_models["random-forest"]
+    importance_model_name = importance_model.name
+    importances = importance_model.estimator.feature_importances_
 
 feat_imp_df = (
     pd.DataFrame({"Признак": X_train.columns, "Важность": importances})
@@ -272,14 +287,3 @@ plt.ylabel("Признак")
 plt.tight_layout()
 plt.savefig(REPORTS_DIR / "feature_importance.png", dpi=300)
 plt.show()
-
-# Сохранение лучшей модели и списка колонок
-best_metrics = results_df.iloc[0][["Accuracy", "Precision", "Recall", "F1-score", "ROC-AUC"]].to_dict()
-metadata = save_versioned_model(
-    model=best_model_instance,
-    columns=X_train.columns,
-    model_name=best_model_name,
-    metrics=best_metrics,
-    preprocess_params=preprocess_params,
-)
-print(f"\nМодель {best_model_name} (v{metadata['version']}) сохранена в artifacts/v{metadata['version']}/")

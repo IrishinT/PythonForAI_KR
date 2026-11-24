@@ -1,0 +1,43 @@
+Сухой солнечный день
+{
+  "MinTemp": 14.0,
+  "MaxTemp": 28.5,
+  "Rainfall": 0.0,
+  "WindGustSpeed": 28.0,
+  "WindSpeed9am": 11.0,
+  "WindSpeed3pm": 15.0,
+  "Humidity9am": 48.0,
+  "Humidity3pm": 24.0,
+  "Pressure9am": 1022.5,
+  "Pressure3pm": 1020.8,
+  "Temp9am": 19.5,
+  "Temp3pm": 27.2,
+  "RainToday": "No",
+  "Month": 1,
+  "Location": "Sydney",
+  "WindGustDir": "NE",
+  "WindDir9am": "ENE",
+  "WindDir3pm": "NE"
+}
+
+Дождливый день с высокой влажностью
+{
+  "MinTemp": 11.2,
+  "MaxTemp": 15.8,
+  "Rainfall": 18.4,
+  "WindGustSpeed": 67.0,
+  "WindSpeed9am": 26.0,
+  "WindSpeed3pm": 33.0,
+  "Humidity9am": 92.0,
+  "Humidity3pm": 89.0,
+  "Pressure9am": 1003.2,
+  "Pressure3pm": 998.5,
+  "Temp9am": 12.8,
+  "Temp3pm": 14.1,
+  "RainToday": "Yes",
+  "Month": 7,
+  "Location": "Melbourne",
+  "WindGustDir": "SW",
+  "WindDir9am": "W",
+  "WindDir3pm": "SSW"
+}

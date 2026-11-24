@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from data.model_artifacts import LEGACY_MODEL_ID
 from ml.features import prepare_features
 
 
@@ -11,8 +12,9 @@ class RainPrediction:
 
 
 class PredictionService:
-    def __init__(self, model, *, model_name, version, feature_names, preprocess_params):
+    def __init__(self, model, *, model_name, version, feature_names, preprocess_params, model_id=LEGACY_MODEL_ID):
         self._model = model
+        self.model_id = model_id
         self.model_name = model_name
         self.version = version
         self._feature_names = feature_names
