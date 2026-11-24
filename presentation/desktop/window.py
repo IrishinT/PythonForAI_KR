@@ -1,5 +1,5 @@
-from PySide6.QtCore import QPointF, QRegularExpression, Qt
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QRegularExpressionValidator
+from PySide6.QtCore import QPointF, QRegularExpression, QSignalBlocker, Qt
+from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QRegularExpressionValidator
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QComboBox,
@@ -12,10 +12,12 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QStyle,
     QStyleOptionSpinBox,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from presentation.desktop.metrics import MetricsPanel
 from presentation.weather_input import (
     DECIMAL_PATTERN,
     LOCATIONS,
@@ -176,20 +178,23 @@ class ForecastWindow(QMainWindow):
         self.client = client
         self.entries = {}
         self.connection_error = False
+        self.loading = False
+        self.releases = {}
+        self.latest_version = None
+        self.catalog_pending = False
+        self.legacy_api = False
+        self.metrics_request = 0
         self.setWindowTitle("Дождь завтра")
-        self.resize(1000, 630)
+        self.resize(1080, 770)
         self.setMinimumSize(840, 580)
 
         page = QWidget()
         page.setObjectName("page")
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(page)
-        self.setCentralWidget(scroll)
+        self.setCentralWidget(page)
 
         body = QVBoxLayout(page)
-        body.setContentsMargins(42, 34, 42, 33)
-        body.setSpacing(30)
+        body.setContentsMargins(34, 24, 34, 20)
+        body.setSpacing(15)
 
         top = QHBoxLayout()
         top.setSpacing(8)
@@ -214,17 +219,149 @@ class ForecastWindow(QMainWindow):
         self.retry_button.clicked.connect(self.retry_connection)
         top.addWidget(self.retry_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         body.addLayout(top)
+        body.addWidget(self.build_model_selector())
 
-        panels = QHBoxLayout()
-        panels.setSpacing(34)
+        forecast_page = QWidget()
+        forecast_page.setObjectName("page")
+        panels = QHBoxLayout(forecast_page)
+        panels.setContentsMargins(20, 18, 20, 20)
+        panels.setSpacing(28)
         panels.addWidget(self.build_form(), stretch=3)
         panels.addWidget(self.build_result(), stretch=2)
-        body.addLayout(panels, stretch=1)
+        forecast_scroll = QScrollArea()
+        forecast_scroll.setWidgetResizable(True)
+        forecast_scroll.setWidget(forecast_page)
+
+        self.tabs = QTabWidget()
+        self.metrics_panel = MetricsPanel()
+        self.tabs.addTab(forecast_scroll, "Прогноз")
+        self.tabs.addTab(self.metrics_panel, "Метрики")
+        self.tabs.currentChanged.connect(self.refresh_metrics)
+        body.addWidget(self.tabs, stretch=1)
 
         self.client.server_status.connect(self.show_server_status)
         self.client.predicted.connect(self.show_prediction)
         self.client.failed.connect(self.show_error)
+        self.update_controls()
         self.retry_connection()
+
+    def build_model_selector(self):
+        container = QWidget()
+        layout = QGridLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(14)
+        layout.setVerticalSpacing(5)
+        self.version_box = ChoiceBox("Выберите версию")
+        self.model_box = ChoiceBox("Выберите модель")
+        self.version_box.currentIndexChanged.connect(self.show_release_models)
+        self.model_box.currentIndexChanged.connect(self.model_changed)
+        layout.addWidget(self.field("Версия модели", self.version_box), 0, 0)
+        layout.addWidget(self.field("Модель", self.model_box), 0, 1)
+        layout.setColumnStretch(1, 1)
+        self.catalog_status = label("Загружаем список моделей…", "resultCaption")
+        layout.addWidget(self.catalog_status, 1, 0, 1, 2)
+        return container
+
+    def refresh_catalog(self):
+        if self.catalog_pending:
+            return
+        self.catalog_pending = True
+        self.catalog_status.setText("Загружаем список моделей…")
+        self.catalog_status.show()
+        self.client.get_data("/models/versions", self.show_catalog)
+
+    def show_catalog(self, status, payload):
+        self.catalog_pending = False
+        versions = payload.get("versions")
+        if status != 200 or not isinstance(versions, list) or not versions:
+            self.legacy_api = status == 404 and not self.releases
+            message = "Доступна модель сервера по умолчанию." if self.legacy_api else "Не удалось загрузить список моделей."
+            self.catalog_status.setText(message)
+            self.catalog_status.show()
+            self.update_controls()
+            return
+
+        version, model_id = self.selection()
+        self.releases = {release["model_version"]: release for release in versions}
+        self.latest_version = payload["latest_version"]
+        self.legacy_api = False
+        with QSignalBlocker(self.version_box):
+            self.version_box.clear()
+            for release_version in self.releases:
+                text = f"{release_version} (последняя)" if release_version == self.latest_version else release_version
+                self.version_box.addItem(text, release_version)
+            selected_version = version if version in self.releases else self.latest_version
+            self.version_box.setCurrentIndex(max(0, self.version_box.findData(selected_version)))
+        self.catalog_status.hide()
+        self.populate_models(model_id if selected_version == version else None)
+
+    def show_release_models(self):
+        self.populate_models()
+
+    def populate_models(self, preferred=None):
+        version = self.version_box.currentData()
+        release = self.releases.get(version)
+        with QSignalBlocker(self.model_box):
+            self.model_box.clear()
+            if release:
+                default = release["default_model_id"]
+                for model in release["models"]:
+                    model_id, name = model["model_id"], model["model_name"]
+                    recommended = version == self.latest_version and model_id == default
+                    text = f"{name} (рекомендуемая)" if recommended else name
+                    self.model_box.addItem(text, model_id)
+                    if recommended:
+                        self.model_box.setItemData(
+                            self.model_box.count() - 1, QBrush(QColor("#286a48")), Qt.ItemDataRole.ForegroundRole,
+                        )
+                index = self.model_box.findData(preferred or default)
+                if index < 0:
+                    index = self.model_box.findData(default)
+                self.model_box.setCurrentIndex(max(0, index))
+        self.model_changed()
+
+    def selection(self):
+        return self.version_box.currentData(), self.model_box.currentData()
+
+    def model_changed(self):
+        version, model_id = self.selection()
+        release = self.releases.get(version)
+        recommended = bool(release and version == self.latest_version and model_id == release["default_model_id"])
+        update_state(self.model_box, "recommended", recommended)
+        if not self.loading:
+            self.clear_feedback()
+        self.update_controls()
+        self.refresh_metrics()
+
+    def refresh_metrics(self):
+        self.metrics_request += 1
+        if self.tabs.currentWidget() is not self.metrics_panel:
+            return
+        version, model_id = self.selection()
+        if version is None or model_id is None:
+            self.metrics_panel.show_status("Выберите модель, чтобы посмотреть её метрики.")
+            return
+        self.metrics_panel.show_status("Загружаем метрики модели…")
+        request_id = self.metrics_request
+
+        def display(status, payload):
+            if request_id != self.metrics_request:
+                return
+            if status == 200 and (payload.get("model_version"), payload.get("model_id")) == (version, model_id):
+                for chart_id in self.metrics_panel.show_metrics(payload):
+                    self.client.get_image(
+                        f"/models/metrics/{chart_id}",
+                        lambda status, content, key=chart_id: display_image(key, status, content),
+                        model_version=version, model_id=model_id,
+                    )
+            else:
+                self.metrics_panel.show_status("Не удалось загрузить метрики модели. Переключите вкладку, чтобы повторить.")
+
+        def display_image(chart_id, status, content):
+            if request_id == self.metrics_request:
+                self.metrics_panel.charts[chart_id].show_image(content if status == 200 else b"")
+
+        self.client.get_data("/models/metrics", display, model_version=version, model_id=model_id)
 
     def build_form(self):
         form = QWidget()
@@ -314,6 +451,11 @@ class ForecastWindow(QMainWindow):
         self.place = label("", "resultPlace")
         self.place.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.place)
+        self.result_model = label("", "resultCaption")
+        self.result_model.setWordWrap(True)
+        self.result_model.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.result_model.hide()
+        layout.addWidget(self.result_model)
         layout.addSpacing(15)
         self.probability = label("—", "probability")
         layout.addWidget(self.probability, alignment=Qt.AlignmentFlag.AlignHCenter)
@@ -332,12 +474,18 @@ class ForecastWindow(QMainWindow):
             "offline": "Нет подключения",
             "error": "Ошибка сервиса",
         }
+        previous = self.status_dot.property("state")
         self.status.setText(texts[state])
         update_state(self.status_dot, "state", state)
         self.retry_button.setVisible(state in ("offline", "error"))
         if state == "online" and self.connection_error:
             self.connection_error = False
             self.message.hide()
+        if state == "online" and (previous != "online" or not self.releases and not self.legacy_api):
+            self.refresh_catalog()
+        if state in ("offline", "error") and not self.releases:
+            self.catalog_status.setText("Список моделей появится после подключения к серверу.")
+            self.catalog_status.show()
 
     def clear_feedback(self):
         self.message.hide()
@@ -346,6 +494,7 @@ class ForecastWindow(QMainWindow):
             self.probability.setText("—")
             self.verdict.setText("Прогноз ещё не получен")
             self.place.clear()
+            self.result_model.hide()
             self.result_card.setToolTip("")
 
     def read_form(self):
@@ -376,20 +525,31 @@ class ForecastWindow(QMainWindow):
         self.clear_feedback()
         self.set_loading(True)
         self.verdict.setText("Рассчитываем прогноз…")
-        self.client.predict(weather)
+        self.client.predict(weather, *self.selection())
 
     def set_loading(self, loading):
-        for control in (*self.entries.values(), self.location, self.wind, self.submit_button, self.retry_button):
-            control.setEnabled(not loading)
+        self.loading = loading
+        self.update_controls()
         self.submit_button.setText("Рассчитываем…" if loading else "Получить прогноз")
 
-    def show_prediction(self, rain, probability, version):
+    def update_controls(self):
+        for control in (*self.entries.values(), self.location, self.wind, self.retry_button):
+            control.setEnabled(not self.loading)
+        self.version_box.setEnabled(not self.loading and bool(self.releases))
+        self.model_box.setEnabled(not self.loading and self.model_box.count() > 0)
+        self.submit_button.setEnabled(not self.loading and (self.model_box.currentData() is not None or self.legacy_api))
+
+    def show_prediction(self, rain, probability, version, model_id):
         self.set_loading(False)
         self.weather_icon.set_rain(rain)
         self.probability.setText(format_probability(probability))
         self.verdict.setText("Ожидается дождь" if rain else "Дождь не ожидается")
         self.place.setText(self.location.currentText())
-        self.result_card.setToolTip(f"Модель v{version}" if version else "")
+        release = self.releases.get(version, {})
+        name = next((entry["model_name"] for entry in release.get("models", []) if entry["model_id"] == model_id), model_id)
+        details = " · ".join(value for value in (name, f"v{version}" if version else "") if value)
+        self.result_model.setText(details)
+        self.result_model.setVisible(bool(details))
 
     def show_error(self, message):
         self.set_loading(False)

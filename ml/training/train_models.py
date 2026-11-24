@@ -29,6 +29,7 @@ if not __package__:
 from business.model_registry import ModelCandidate, save_model_release
 from data.datasets import load_preprocess_params, load_training_data
 from ml.features import KEY_WEATHER_FIELDS, select_preprocess_params
+from ml.training.model_diagnostics import evaluation_diagnostics, learning_diagnostics, render_model_charts
 
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 
@@ -178,13 +179,16 @@ for name, config in models_config.items():
         }
     )
 
-    release_models[config["id"]] = ModelCandidate(best_model, name, {
+    metrics = {
         "Accuracy": acc,
         "Precision": prec,
         "Recall": rec,
         "F1-score": f1,
         "ROC-AUC": roc_auc,
-    })
+    }
+    evaluation = evaluation_diagnostics(y_test, y_pred, y_proba)
+    learning = learning_diagnostics(best_model, X_train, y_train, X_test, y_test)
+    release_models[config["id"]] = ModelCandidate(best_model, name, metrics, render_model_charts(evaluation, learning))
     fpr, tpr, _ = roc_curve(y_test, y_proba)
     roc_data[name] = (fpr, tpr, roc_auc)
 

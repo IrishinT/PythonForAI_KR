@@ -1,13 +1,22 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 
-from business.model_registry import MODEL_ID_PATTERN, VERSION_PATTERN, list_version_models
+from business.model_registry import (
+    MODEL_ID_PATTERN,
+    VERSION_PATTERN,
+    list_model_releases,
+    list_version_models,
+    model_chart_path,
+    read_model_metrics,
+)
 
 from .schemas import WeatherInput
 
 router = APIRouter()
 ModelVersion = Annotated[str | None, Query(pattern=VERSION_PATTERN, examples=["1.1.0"])]
+ModelId = Annotated[str | None, Query(pattern=MODEL_ID_PATTERN, examples=["random-forest"])]
 
 
 @router.get("/health")
@@ -31,14 +40,40 @@ def models(request: Request, model_version: ModelVersion = None):
         raise HTTPException(404, f"Model version {version} not found") from exc
 
 
+@router.get("/models/versions")
+def model_versions():
+    return list_model_releases()
+
+
+@router.get("/models/metrics", responses={404: {"description": "Model or version not found"}})
+def model_metrics(request: Request, model_version: ModelVersion = None, model_id: ModelId = None):
+    version = model_version or request.app.state.prediction_service.version
+    try:
+        return read_model_metrics(version, model_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, f"Model {model_id or 'default'} not found in version {version}") from exc
+
+
+@router.get(
+    "/models/metrics/{chart_id}",
+    response_class=FileResponse,
+    responses={200: {"content": {"image/png": {}}}, 404: {"description": "Chart not found"}},
+)
+def model_chart(chart_id: str, request: Request, model_version: ModelVersion = None, model_id: ModelId = None):
+    version = model_version or request.app.state.prediction_service.version
+    try:
+        path = model_chart_path(version, model_id, chart_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Chart not found for the selected model") from exc
+    return FileResponse(path, media_type="image/png")
+
+
 @router.post("/predict", responses={404: {"description": "Model or version not found"}})
 def predict(
     weather: WeatherInput,
     request: Request,
     model_version: ModelVersion = None,
-    model_id: Annotated[
-        str | None, Query(pattern=MODEL_ID_PATTERN, examples=["random-forest"])
-    ] = None,
+    model_id: ModelId = None,
 ):
     service = request.app.state.prediction_service
     version = (model_version or service.version).removeprefix("v")

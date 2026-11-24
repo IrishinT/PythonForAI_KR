@@ -93,6 +93,46 @@ QLabel {
     font-size: 13px;
     font-weight: 500;
 }
+QTabWidget::pane {
+    border: 1px solid #dbe4ee;
+    border-radius: 9px;
+    background: #ffffff;
+}
+QTabBar::tab {
+    color: #5c6d7e;
+    background: #f5f8fb;
+    border: 1px solid #dbe4ee;
+    border-top-left-radius: 7px;
+    border-top-right-radius: 7px;
+    min-width: 100px;
+    padding: 8px 14px;
+    margin-right: 4px;
+}
+QTabBar::tab:selected {
+    color: #255b9f;
+    background: #ffffff;
+    font-weight: 600;
+}
+QTabBar::tab:hover {
+    color: #255b9f;
+}
+#metricCard {
+    background: #f5f8fb;
+    border: 1px solid #e1e8ef;
+    border-radius: 8px;
+}
+#metricValue {
+    color: #23446b;
+    font-size: 21px;
+    font-weight: 650;
+}
+#chartImage {
+    background: #ffffff;
+    border: 1px solid #e1e8ef;
+    border-radius: 8px;
+    padding: 7px;
+    color: #5c6d7e;
+}
 QAbstractSpinBox, QComboBox {
     border: 1px solid #c9d4df;
     border-radius: 7px;
@@ -162,6 +202,11 @@ QComboBox QAbstractItemView::item {
 QAbstractSpinBox:disabled, QComboBox:disabled {
     color: #687888;
     background: #f4f6f8;
+}
+QComboBox[recommended="true"]:enabled {
+    color: #286a48;
+    background: #edf7f1;
+    border-color: #8ebda3;
 }
 #submit {
     min-height: 42px;

@@ -14,6 +14,7 @@ class ModelCandidate:
     estimator: object
     name: str
     metrics: dict[str, float]
+    charts: dict[str, bytes] | None = None
 
 
 def _model_metadata(
@@ -82,7 +83,11 @@ def save_model_release(
     while True:
         version = f"{major}.{minor}.{patch}"
         artifacts = {
-            model_id: (candidate.estimator, {**metadata[model_id], "version": version, "model_id": model_id})
+            model_id: (
+                candidate.estimator,
+                {**metadata[model_id], "version": version, "model_id": model_id},
+                candidate.charts,
+            )
             for model_id, candidate in models.items()
         }
         if store.write_release(version, artifacts, default_id) is not None:
@@ -112,6 +117,29 @@ def list_version_models(
             {"model_id": model_id, "model_name": name} for model_id, name in catalog["models"].items()
         ],
     }
+
+
+def list_model_releases(artifacts_dir: str | Path = DEFAULT_ARTIFACTS_DIR) -> dict:
+    store = FileModelStore(artifacts_dir)
+    versions = sorted(
+        (version for version in store.list_versions() if re.fullmatch(VERSION_PATTERN, version)),
+        key=lambda version: tuple(map(int, version.split("."))),
+        reverse=True,
+    )
+    return {
+        "latest_version": _resolve_version(store, None),
+        "versions": [list_version_models(version, artifacts_dir) for version in versions],
+    }
+
+
+def read_model_metrics(version: str, model_id: str | None = None) -> dict:
+    store = FileModelStore(DEFAULT_ARTIFACTS_DIR)
+    return store.read_model_metrics(_resolve_version(store, version), model_id)
+
+
+def model_chart_path(version: str, model_id: str | None, chart_id: str) -> Path:
+    store = FileModelStore(DEFAULT_ARTIFACTS_DIR)
+    return store.model_chart_path(_resolve_version(store, version), model_id, chart_id)
 
 
 def load_versioned_model(
