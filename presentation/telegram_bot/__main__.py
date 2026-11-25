@@ -4,6 +4,7 @@ from os import getenv
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.fsm.storage.memory import SimpleEventIsolation
 from aiogram.utils.token import TokenValidationError
 from aiohttp import ClientSession, ClientTimeout
@@ -13,12 +14,12 @@ from .handlers import router
 from .weather_api import WeatherApi
 
 
-async def run(token, api_url):
+async def run(token, api_url, proxy_url=None):
     dispatcher = Dispatcher(events_isolation=SimpleEventIsolation())
     dispatcher.include_router(router)
     async with ClientSession(timeout=ClientTimeout(total=7)) as session:
         weather_api = WeatherApi(session, api_url)
-        async with Bot(token) as bot:
+        async with Bot(token, session=AiohttpSession(proxy=proxy_url)) as bot:
             await dispatcher.start_polling(bot, weather_api=weather_api, close_bot_session=False)
 
 
@@ -30,7 +31,7 @@ def main():
     api_url = getenv("WEATHER_API_URL") or "http://127.0.0.1:8000"
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     try:
-        asyncio.run(run(token, api_url))
+        asyncio.run(run(token, api_url, getenv("TELEGRAM_PROXY_URL", "").strip() or None))
     except TokenValidationError:
         raise SystemExit("Проверьте TELEGRAM_BOT_TOKEN в файле .env.") from None
     except ValueError as error:
