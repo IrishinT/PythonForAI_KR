@@ -3,6 +3,8 @@ from PySide6.QtGui import QBrush, QColor, QPainter, QPainterPath, QPen, QRegular
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -203,7 +205,7 @@ class ForecastWindow(QMainWindow):
         heading = QVBoxLayout()
         heading.setSpacing(6)
         heading.addWidget(label("Будет ли завтра дождь?", "heading"))
-        heading.addWidget(label("Прогноз по данным сегодняшних наблюдений.", "subtitle"))
+        heading.addWidget(label("Оцените вероятность дождя по своим наблюдениям за сегодня.", "subtitle"))
         top.addLayout(heading)
         top.addStretch()
         self.status_dot = QFrame()
@@ -219,6 +221,11 @@ class ForecastWindow(QMainWindow):
         self.retry_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.retry_button.clicked.connect(self.retry_connection)
         top.addWidget(self.retry_button, alignment=Qt.AlignmentFlag.AlignVCenter)
+        help_button = QPushButton("Справка")
+        help_button.setObjectName("helpButton")
+        help_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        help_button.clicked.connect(self.show_help)
+        top.addWidget(help_button, alignment=Qt.AlignmentFlag.AlignVCenter)
         body.addLayout(top)
         body.addWidget(self.build_model_selector())
 
@@ -249,6 +256,73 @@ class ForecastWindow(QMainWindow):
         self.client.failed.connect(self.show_error)
         self.update_controls()
         self.retry_connection()
+
+    def show_help(self):
+        dialog = QDialog(self)
+        dialog.setObjectName("helpDialog")
+        dialog.setWindowTitle("Справка")
+        dialog.resize(580, 450)
+        dialog.setMinimumSize(420, 320)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 20, 24, 16)
+        layout.setSpacing(14)
+
+        guide = QWidget()
+        guide.setObjectName("page")
+        sections = QVBoxLayout(guide)
+        sections.setContentsMargins(0, 0, 8, 0)
+        sections.setSpacing(14)
+
+        intro = QVBoxLayout()
+        intro.setSpacing(4)
+        intro.addWidget(label("Дождь завтра", "helpTitle"))
+        summary = label(
+            "Приложение оценивает вероятность дождя на завтра по данным за сегодня. "
+            "Модели обучены на наблюдениях австралийских метеостанций (Rain in Australia).", "helpText",
+        )
+        summary.setWordWrap(True)
+        intro.addWidget(summary)
+        sections.addLayout(intro)
+
+        for title, text in (
+            ("Как получить прогноз",
+             "1. Выберите город или станцию из списка.\n"
+             "2. Заполните поля по сегодняшним наблюдениям в указанных единицах.\n"
+             "3. Нажмите «Получить прогноз». Вероятность дождя появится справа."),
+            ("Как выбрать модель",
+             "Выберите версию и модель над вкладками. Зелёным отмечена лучшая модель последнего выпуска по ROC-AUC. "
+             "Метрики и графики выбранной модели доступны на вкладке «Метрики»."),
+            ("Обучение моделей",
+             "Если у вас есть мастер-ключ, введите его на вкладке «Обучение». "
+             "После запуска там виден прогресс, а новый выпуск появится в списке версий."),
+        ):
+            section = QVBoxLayout()
+            section.setSpacing(3)
+            section.addWidget(label(title, "sectionTitle"))
+            description = label(text, "helpText")
+            description.setWordWrap(True)
+            section.addWidget(description)
+            sections.addLayout(section)
+
+        connection = label("Если нет подключения, проверьте, что сервер запущен, и нажмите «Повторить».", "resultCaption")
+        connection.setWordWrap(True)
+        sections.addWidget(connection)
+        sections.addStretch()
+
+        scroll = QScrollArea()
+        scroll.setAccessibleName("Справка по приложению")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(guide)
+        layout.addWidget(scroll, stretch=1)
+        buttons = QDialogButtonBox()
+        close_button = buttons.addButton("Закрыть", QDialogButtonBox.ButtonRole.RejectRole)
+        close_button.setObjectName("helpClose")
+        close_button.setDefault(True)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.exec()
+        dialog.deleteLater()
 
     def build_model_selector(self):
         container = QWidget()

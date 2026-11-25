@@ -1,5 +1,5 @@
 STYLESHEET = """
-QMainWindow, #page, QScrollArea {
+QMainWindow, #page, #helpDialog, QScrollArea {
     background: #ffffff;
 }
 QScrollArea {
@@ -52,7 +52,7 @@ QLabel {
     border-color: #f8eddc;
     background: #a66620;
 }
-#retryConnection {
+#retryConnection, #helpButton, #helpClose {
     min-height: 28px;
     padding: 0 7px;
     border: 1px solid transparent;
@@ -62,10 +62,15 @@ QLabel {
     font-size: 13px;
     font-weight: 600;
 }
-#retryConnection:hover, #retryConnection:focus {
+#helpButton, #helpClose {
+    padding: 0 10px;
+    border-color: #c9d4df;
+}
+#retryConnection:hover, #retryConnection:focus, #helpButton:hover, #helpButton:focus,
+#helpClose:hover, #helpClose:focus {
     background: #eaf1fa;
 }
-#retryConnection:focus {
+#retryConnection:focus, #helpButton:focus, #helpClose:focus {
     border-color: #3265a6;
 }
 #retryConnection:disabled {
@@ -83,6 +88,14 @@ QLabel {
     border: 1px solid #e1e8ef;
     border-radius: 14px;
     background: #f5f8fb;
+}
+#helpTitle {
+    color: #23446b;
+    font-size: 21px;
+    font-weight: 650;
+}
+#helpText {
+    color: #394b5e;
 }
 #sectionTitle {
     font-size: 16px;

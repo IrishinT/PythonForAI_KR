@@ -24,7 +24,9 @@ services:
       target: bot
     environment:
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}"
+      TELEGRAM_ADMIN_IDS: "${TELEGRAM_ADMIN_IDS:-}"
       WEATHER_API_URL: "http://api:8000"
+      WEATHER_MASTER_KEY: "${WEATHER_MASTER_KEY:-}"
     depends_on:
       api:
         condition: service_healthy
