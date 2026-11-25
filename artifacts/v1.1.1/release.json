@@ -1,0 +1,10 @@
+{
+  "default_model_id": "mlp",
+  "models": {
+    "logistic-regression": "Logistic Regression",
+    "decision-tree": "Decision Tree",
+    "knn": "KNN",
+    "random-forest": "Random Forest",
+    "mlp": "Neural Network (MLP)"
+  }
+}

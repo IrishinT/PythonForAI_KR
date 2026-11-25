@@ -142,6 +142,17 @@ QTabBar::tab:hover {
 #trainingKey:focus {
     border-color: #3265a6;
 }
+#trainingProgress {
+    min-height: 8px;
+    max-height: 8px;
+    border: none;
+    border-radius: 4px;
+    background: #e4ebf3;
+}
+#trainingProgress::chunk {
+    border-radius: 4px;
+    background: #255b9f;
+}
 QAbstractSpinBox, QComboBox {
     border: 1px solid #c9d4df;
     border-radius: 7px;

@@ -1,3 +1,4 @@
+import json
 import sys
 import time
 import warnings
@@ -10,6 +11,7 @@ import pandas as pd
 import seaborn as sns
 from joblib import parallel_config
 
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
@@ -37,14 +39,31 @@ from ml.training.model_diagnostics import evaluation_diagnostics, learning_diagn
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 parser = ArgumentParser(description="Обучить и опубликовать выпуск моделей")
 parser.add_argument("--result-file", type=Path, help="Записать номер выпуска для API без общих отчётов")
-result_file = parser.parse_args().result_file
+parser.add_argument("--progress-file", type=Path, help="Записывать этапы обучения для API")
+args = parser.parse_args()
+result_file = args.result_file
 jobs = 2 if result_file else -1
+
+
+def report_progress(stage, *, model_name=None, completed_models=0, total_models=None):
+    if args.progress_file is None:
+        return
+    event = {
+        "stage": stage,
+        "model_name": model_name,
+        "completed_models": completed_models,
+        "total_models": total_models,
+    }
+    with args.progress_file.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(event, ensure_ascii=False) + "\n")
+
 
 warnings.filterwarnings("ignore")
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", 1000)
 
 # Загрузка подготовленных данных
+report_progress("preparing")
 print("Загрузка обучающей и тестовой выборок...")
 X_train, X_test, y_train, y_test = load_training_data()
 preprocess_params = select_preprocess_params(load_preprocess_params(), KEY_WEATHER_FIELDS)
@@ -137,13 +156,16 @@ for name, config in models_config.items():
 
     X_fit = X_train_sub if config["use_subsample"] else X_train
     y_fit = y_train_sub if config["use_subsample"] else y_train
+    progress = {"model_name": name, "completed_models": len(release_models), "total_models": len(models_config)}
 
+    report_progress("searching", **progress)
     grid = GridSearchCV(
         estimator=config["estimator"],
         param_grid=config["param_grid"],
         scoring="f1",
         cv=3,
         n_jobs=jobs,
+        refit=False,
     )
     with parallel_config(backend="threading") if result_file else nullcontext():
         grid.fit(X_fit, y_fit)
@@ -151,12 +173,15 @@ for name, config in models_config.items():
     print(f"Лучшие гиперпараметры: {best_params}")
 
     # Если искали параметры на подвыборке, обучаем лучшую модель на всем X_train
-    best_model = grid.best_estimator_
+    report_progress("fitting", **progress)
+    best_model = clone(config["estimator"]).set_params(**best_params)
     if config["use_subsample"] and name != "KNN":
         print("Обучение лучшей конфигурации на полной выборке X_train...")
-        best_model.fit(X_train, y_train)
+        X_fit, y_fit = X_train, y_train
+    best_model.fit(X_fit, y_fit)
 
     # Предсказание на тестовой выборке
+    report_progress("evaluating", **progress)
     y_pred = best_model.predict(X_test)
     y_proba = best_model.predict_proba(X_test)[:, 1]
 
@@ -193,12 +218,14 @@ for name, config in models_config.items():
         "F1-score": f1,
         "ROC-AUC": roc_auc,
     }
+    report_progress("charting", **progress)
     evaluation = evaluation_diagnostics(y_test, y_pred, y_proba)
     learning = learning_diagnostics(best_model, X_train, y_train, X_test, y_test)
     release_models[config["id"]] = ModelCandidate(best_model, name, metrics, render_model_charts(evaluation, learning))
     fpr, tpr, _ = roc_curve(y_test, y_proba)
     roc_data[name] = (fpr, tpr, roc_auc)
 
+report_progress("publishing", completed_models=len(release_models), total_models=len(models_config))
 results_df = pd.DataFrame(results).sort_values(by="ROC-AUC", ascending=False).reset_index(drop=True)
 print("\n================ СВОДНАЯ ТАБЛИЦА МЕТРИК ================")
 print(results_df.to_string(index=False))

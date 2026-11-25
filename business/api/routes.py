@@ -36,12 +36,12 @@ async def start_training(request: Request):
     training = request.app.state.training
     if not training.start():
         raise HTTPException(409, "Training is already running")
-    return dict(training.state)
+    return training.snapshot()
 
 
 @router.get("/models/training", dependencies=[Depends(require_master_key)])
 async def training_status(request: Request):
-    return dict(request.app.state.training.state)
+    return request.app.state.training.snapshot()
 
 
 @router.get("/health")

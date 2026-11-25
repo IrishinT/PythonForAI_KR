@@ -1,5 +1,21 @@
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout, QWidget
+
+
+STAGE_NAMES = {
+    "preparing": "Подготовка данных",
+    "searching": "Подбор гиперпараметров",
+    "fitting": "Обучение модели",
+    "evaluating": "Оценка на тестовой выборке",
+    "charting": "Подготовка графиков",
+    "publishing": "Публикация выпуска",
+}
+
+
+def stage_description(payload):
+    stage = STAGE_NAMES.get(payload.get("stage"))
+    model = payload.get("model_name")
+    return f"{stage} для модели {model}" if model and stage else stage
 
 
 class TrainingPanel(QWidget):
@@ -52,6 +68,18 @@ class TrainingPanel(QWidget):
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+
+        self.progress = QProgressBar()
+        self.progress.setObjectName("trainingProgress")
+        self.progress.setAccessibleName("Готовые модели")
+        self.progress.setMaximumWidth(430)
+        self.progress.setTextVisible(False)
+        layout.addWidget(self.progress)
+        self.detail = QLabel()
+        self.detail.setObjectName("resultCaption")
+        self.detail.setTextFormat(Qt.TextFormat.PlainText)
+        self.detail.setWordWrap(True)
+        layout.addWidget(self.detail)
         layout.addStretch()
         self.key.textChanged.connect(self.key_changed)
         self.start_button.clicked.connect(self.start_training)
@@ -65,6 +93,7 @@ class TrainingPanel(QWidget):
         self.request_id += 1
         self.pending = self.running = False
         self.poll.stop()
+        self.show_progress({})
         self.update_button()
         if self.key.text():
             self.status.setText("Проверяем статус обучения…")
@@ -91,6 +120,7 @@ class TrainingPanel(QWidget):
         self.request_id += 1
         request_id = self.request_id
         if start:
+            self.show_progress({})
             self.status.setText("Запускаем обучение…")
 
         def display(status, payload):
@@ -99,24 +129,49 @@ class TrainingPanel(QWidget):
 
         self.client.training(self.key.text(), display, start=start)
 
+    def show_progress(self, payload):
+        completed, total = payload.get("completed_models"), payload.get("total_models")
+        detail = []
+        if type(completed) is int and type(total) is int and 0 <= completed <= total and total > 0:
+            self.progress.setRange(0, total)
+            self.progress.setValue(completed)
+            self.progress.show()
+            detail.append(f"Готово {completed} из {total} моделей")
+        else:
+            self.progress.hide()
+        elapsed = payload.get("elapsed_seconds")
+        if type(elapsed) is int and elapsed >= 0:
+            minutes, seconds = divmod(elapsed, 60)
+            duration = f"{minutes} мин {seconds:02d} с" if minutes else f"{seconds} с"
+            detail.append(f"Прошло {duration}")
+        self.detail.setText(". ".join(detail))
+        self.detail.setVisible(bool(detail))
+
     def show_status(self, status, payload, *, start):
         self.pending = False
         state = payload.get("status") if status in (200, 202) else None
         previously_running = self.running
         retry = False
         self.running = state == "running" or status == 409
+        stage = stage_description(payload)
         if self.running:
-            self.status.setText("Обучение идёт на сервере. Прогнозы доступны во время обучения.")
+            self.status.setText(stage or "Обучение идёт на сервере.")
         elif state == "idle":
             self.status.setText("Можно запустить обучение нового выпуска.")
         elif state == "succeeded" and isinstance(payload.get("model_version"), str):
             version = payload["model_version"]
-            self.status.setText(f"Обучение завершено. Выпуск {version} опубликован.")
+            message = f"Выпуск {version} опубликован."
+            best_model, score = payload.get("best_model_name"), payload.get("best_roc_auc")
+            if isinstance(best_model, str) and type(score) in (int, float):
+                roc_auc = f"{score:.4f}".replace(".", ",")
+                message += f" Модель {best_model} показала лучший ROC-AUC ({roc_auc})."
+            self.status.setText(message)
             if version != self.reported_version:
                 self.reported_version = version
                 self.release_published.emit(version)
         elif state == "failed":
-            self.status.setText("Обучение завершилось ошибкой. Подробности в журнале сервера.")
+            message = f"Сбой на этапе «{stage}»." if stage else "Обучение завершилось ошибкой."
+            self.status.setText(f"{message} Можно повторить запуск. Подробности в журнале сервера.")
         elif status == 401:
             self.status.setText("Сервер отклонил мастер-ключ.")
         elif status == 503:
@@ -127,6 +182,10 @@ class TrainingPanel(QWidget):
             retry = previously_running or start
             self.running = retry
             self.status.setText("Не удалось получить статус обучения. Повторяем запрос…" if retry else "Не удалось получить статус обучения.")
+        if state in ("running", "failed", "succeeded"):
+            self.show_progress(payload)
+        elif not self.running:
+            self.show_progress({})
         self.update_button()
         if self.running or retry:
             self.poll.start(2000)
