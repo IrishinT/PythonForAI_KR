@@ -27,6 +27,7 @@ services:
       TELEGRAM_ADMIN_IDS: "${TELEGRAM_ADMIN_IDS:-}"
       WEATHER_API_URL: "http://api:8000"
       WEATHER_MASTER_KEY: "${WEATHER_MASTER_KEY:-}"
+      TELEGRAM_PROXY_URL: "${TELEGRAM_PROXY_URL:-}"
     depends_on:
       api:
         condition: service_healthy
