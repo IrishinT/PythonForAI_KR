@@ -13,8 +13,11 @@ STAGE_NAMES = {
 
 
 def stage_description(payload):
-    stage = STAGE_NAMES.get(payload.get("stage"))
+    stage_id = payload.get("stage")
+    stage = STAGE_NAMES.get(stage_id)
     model = payload.get("model_name")
+    if stage_id == "fitting" and model:
+        return f"Обучение {model}"
     return f"{stage} для модели {model}" if model and stage else stage
 
 

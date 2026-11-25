@@ -556,7 +556,9 @@ class ForecastWindow(QMainWindow):
         self.place.setText(self.location.currentText())
         release = self.releases.get(version, {})
         name = next((entry["model_name"] for entry in release.get("models", []) if entry["model_id"] == model_id), model_id)
-        details = " · ".join(value for value in (name, f"v{version}" if version else "") if value)
+        details = name
+        if version:
+            details = f"{name} (v{version})" if name else f"v{version}"
         self.result_model.setText(details)
         self.result_model.setVisible(bool(details))
 

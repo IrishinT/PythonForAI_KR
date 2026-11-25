@@ -1,6 +1,7 @@
 /.venv/
 /.env
 /report/
+/logs/
 /ds_rainfall_distribution.png
 /ds_missing.png
 /1_ds_analyzing/ds_missing.png

@@ -110,6 +110,8 @@ def predict(
         raise HTTPException(404, detail) from exc
 
     prediction = service.predict(weather.model_dump())
+    request.state.model_version = prediction.model_version
+    request.state.model_id = service.model_id
     return {
         "rain_tomorrow": prediction.rain_tomorrow,
         "probability": round(prediction.probability, 4),

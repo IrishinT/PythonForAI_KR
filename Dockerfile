@@ -18,6 +18,7 @@ COPY data/processed/ data/processed/
 COPY ml/__init__.py ml/features.py ml/
 COPY ml/training/ ml/training/
 COPY --chown=10001:10001 artifacts/ artifacts/
+RUN mkdir /app/logs && chown 10001:10001 /app/logs
 
 USER 10001:10001
 EXPOSE 8000
